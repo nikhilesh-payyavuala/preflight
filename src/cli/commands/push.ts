@@ -20,21 +20,27 @@ export async function cmdPush(opts: { message?: string }): Promise<void> {
   // Stage all changes
   await Bun.$`git -C ${PREFLIGHT_DIR} add -A`.quiet();
 
-  // Check if there's anything to commit
+  // Commit if there are staged changes
   const status = await Bun.$`git -C ${PREFLIGHT_DIR} status --porcelain`.quiet();
   const changes = status.stdout.toString().trim();
 
-  if (!changes) {
-    console.log("No changes to push.");
-    return;
+  if (changes) {
+    const msg = opts.message ?? `pf: update plans (${new Date().toISOString().slice(0, 10)})`;
+    await Bun.$`git -C ${PREFLIGHT_DIR} commit -m ${msg}`.quiet();
   }
 
-  // Auto-commit
-  const msg = opts.message ?? `pf: update plans (${new Date().toISOString().slice(0, 10)})`;
-  await Bun.$`git -C ${PREFLIGHT_DIR} commit -m ${msg}`.quiet();
-
-  // Push
-  await Bun.$`git -C ${PREFLIGHT_DIR} push`.quiet();
-
-  console.log("Plans pushed.");
+  // Push (even if no new commit — there may be unpushed commits)
+  try {
+    const result = await Bun.$`git -C ${PREFLIGHT_DIR} push 2>&1`.quiet();
+    const output = result.stdout.toString().trim();
+    if (output.includes("Everything up-to-date")) {
+      console.log("Already up to date.");
+    } else {
+      console.log("Plans pushed.");
+    }
+  } catch (e: any) {
+    // First push may need -u
+    await Bun.$`git -C ${PREFLIGHT_DIR} push -u origin HEAD`.quiet();
+    console.log("Plans pushed.");
+  }
 }
