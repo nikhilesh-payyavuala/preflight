@@ -109,22 +109,26 @@ export async function pickPlan(opts: {
   return { slug, action };
 }
 
-// Resolve a slug: use provided one, or launch picker with status actions
+// Resolve a slug: use provided one, or launch picker with status actions.
+// Loops on status changes so the user stays in the picker.
 export async function resolveSlug(
   slug: string | undefined,
   opts: { prompt?: string } = {}
 ): Promise<string | null> {
   if (slug) return slug;
-  const result = await pickPlan(opts);
-  if (!result) return null;
 
-  // Handle status transitions from picker
-  if (result.action !== "show") {
-    const { updateMeta } = await import("../core/meta.ts");
-    await updateMeta(result.slug, { status: result.action as any });
-    console.log(`${result.slug} → ${result.action}`);
-    return null; // Don't open the plan, just changed status
+  while (true) {
+    const result = await pickPlan(opts);
+    if (!result) return null;
+
+    // Status transition — apply and re-launch picker
+    if (result.action !== "show") {
+      const { updateMeta } = await import("../core/meta.ts");
+      await updateMeta(result.slug, { status: result.action as any });
+      console.log(`${result.slug} → ${result.action}`);
+      continue; // Loop back to picker with updated data
+    }
+
+    return result.slug;
   }
-
-  return result.slug;
 }
