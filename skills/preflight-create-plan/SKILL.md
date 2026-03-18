@@ -76,7 +76,7 @@ The plan lives at `~/.preflight/plans/<slug>/plan.md`. Write all sections:
 
 **Context** — Why this is being done. What problem it solves. Key design decisions and tradeoffs. If this is a child plan, reference the parent: "See [parent-slug] for full context." Only add context specific to this plan's scope.
 
-**Goals** — Checkbox list of success criteria. Be specific and verifiable. A human should be able to glance at these and understand what "done" means.
+**Goals** — What does "done" look like? Success criteria, scope boundaries, acceptance criteria. Write as prose or bullet points — not checkboxes. A human should be able to glance at these and understand the scope.
 
 **Reviews** — Leave this section empty. Reviews are appended by `pf update --review`.
 

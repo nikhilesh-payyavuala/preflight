@@ -41,8 +41,9 @@ Every plan lives at `~/.preflight/plans/<slug>/` with two files:
 Why we're doing this. Design decisions. Tradeoffs.
 
 ## Goals
-- [ ] Users can authenticate via OAuth2 providers
-- [ ] Zero downtime — rolling migration with feature flag
+Users can authenticate via OAuth2 providers (Google, GitHub).
+Existing session-based auth continues to work during migration.
+Zero downtime — rolling migration with feature flag.
 
 ## Reviews
 **2026-03-15 — claude:** APPROVE. Consider rate limiting on callback.

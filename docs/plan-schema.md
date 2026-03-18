@@ -23,8 +23,10 @@ who needs to understand intent without reading implementation details.
 
 ## Goals
 
-- [ ] Verifiable success criterion (not "improve performance" — "p99 < 200ms")
-- [ ] Another criterion
+Users can authenticate via OAuth2 providers (Google, GitHub).
+Existing session-based auth continues to work during migration.
+Zero downtime — rolling migration with feature flag.
+p99 latency stays under 200ms.
 
 ## Reviews
 

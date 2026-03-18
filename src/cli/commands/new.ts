@@ -11,7 +11,7 @@ const PLAN_TEMPLATE = `## Context
 
 ## Goals
 
-- [ ] <!-- success criterion -->
+<!-- What does "done" look like? Success criteria, scope boundaries, acceptance criteria. -->
 
 ## Reviews
 
