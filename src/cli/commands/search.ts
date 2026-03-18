@@ -2,15 +2,15 @@ import { DB_PATH, listSlugs } from "../../core/store.ts";
 import { readMeta } from "../../core/meta.ts";
 import { existsSync } from "fs";
 import { rebuildIndex, searchPlans } from "../../core/db.ts";
-import { pickPlan } from "../interactive.ts";
-import { formatPlanLine, formatPlanLineFzf, STATUS_COLOR, RESET } from "../format.ts";
+import { pickSlug } from "../interactive.ts";
+import { STATUS_COLOR, RESET } from "../format.ts";
 import { cmdShow } from "./show.ts";
 
 export async function cmdSearch(
   query: string | undefined,
-  opts: { limit?: number; json?: boolean; status?: string; repo?: string; tag?: string; owner?: string; plain?: boolean; fzf?: boolean }
+  opts: { limit?: number; json?: boolean; status?: string; repo?: string; tag?: string; owner?: string; plain?: boolean }
 ): Promise<void> {
-  // No query = list all plans (absorbs old `pf list`)
+  // No query = list all plans
   if (!query) {
     const slugs = await listSlugs();
     if (slugs.length === 0) {
@@ -40,13 +40,7 @@ export async function cmdSearch(
       return;
     }
 
-    // fzf mode — tab-delimited: slug\tdisplay (used by fzf reload)
-    if (opts.fzf) {
-      for (const meta of filtered) console.log(formatPlanLineFzf(meta));
-      return;
-    }
-
-    // Plain mode — non-interactive
+    // Plain mode or non-TTY
     if (opts.plain || !process.stdout.isTTY) {
       for (const meta of filtered) {
         const color = STATUS_COLOR[meta.status] ?? "";
@@ -56,13 +50,9 @@ export async function cmdSearch(
       return;
     }
 
-    // Interactive fzf browser with status transition keys
-    const result = await pickPlan();
-    if (!result) return;
-    if (result.action === "show") {
-      await cmdShow(result.slug, { brief: false });
-    }
-    // Status transitions already handled by pickPlan
+    // Interactive: pick a plan, show it (with actions)
+    const slug = await pickSlug();
+    if (slug) await cmdShow(slug, { brief: false });
     return;
   }
 
@@ -72,19 +62,19 @@ export async function cmdSearch(
     await rebuildIndex();
   }
 
-  const results = searchPlans(query, opts.limit ?? 20);
+  const searchResults = searchPlans(query, opts.limit ?? 20);
 
-  if (results.length === 0) {
+  if (searchResults.length === 0) {
     console.log(`No plans match: "${query}"`);
     return;
   }
 
   if (opts.json) {
-    console.log(JSON.stringify(results, null, 2));
+    console.log(JSON.stringify(searchResults, null, 2));
     return;
   }
 
-  for (const r of results) {
+  for (const r of searchResults) {
     console.log(`${r.slug}  —  ${r.title}`);
   }
 }

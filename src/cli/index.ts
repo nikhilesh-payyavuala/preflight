@@ -39,7 +39,6 @@ program
   .option("--tag <tag>", "Filter by tag")
   .option("--owner <name>", "Filter by owner")
   .option("--plain", "Plain list output, no interactive picker")
-  .option("--fzf", "Output in fzf-compatible format (used internally)")
   .option("--json", "Output JSON")
   .action((query, opts) =>
     cmdSearch(query, { ...opts, limit: parseInt(opts.limit) })

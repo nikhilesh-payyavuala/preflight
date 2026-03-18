@@ -1,10 +1,11 @@
-import { readMeta } from "../../core/meta.ts";
+import { readMeta, updateMeta } from "../../core/meta.ts";
 import { planPath } from "../../core/store.ts";
-import { fzfSelect } from "../interactive.ts";
+import { resolveSlug, pickSlug } from "../interactive.ts";
 import { STATUS_COLOR, RESET } from "../format.ts";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
-import type { PlanMeta } from "../../types/index.ts";
+import { select } from "@clack/prompts";
+import type { PlanMeta, PlanStatus } from "../../types/index.ts";
 
 const STEP_ICON = { pending: "○", "in-progress": "▶", completed: "✓" } as const;
 
@@ -25,17 +26,12 @@ function formatStepsDetail(meta: PlanMeta): string | null {
 function renderMarkdown(content: string): string {
   const origEnv = process.env.FORCE_COLOR;
   process.env.FORCE_COLOR = "1";
-
-  marked.use(markedTerminal({
-    showSectionPrefix: false,
-  }));
+  marked.use(markedTerminal({ showSectionPrefix: false }));
   const result = (marked.parse(content) as string)
     .replace(/^( *)(\* )/gm, "$1- ")
     .trim();
-
   if (origEnv === undefined) delete process.env.FORCE_COLOR;
   else process.env.FORCE_COLOR = origEnv;
-
   return result;
 }
 
@@ -43,9 +39,7 @@ function printHeader(meta: PlanMeta): void {
   const color = STATUS_COLOR[meta.status] ?? "";
   console.log(`\x1b[1m${meta.title}\x1b[0m  \x1b[2m(${meta.slug})\x1b[0m`);
   const ownerPart = meta.owner ? `  |  Owner: ${meta.owner}` : "";
-  console.log(
-    `Status: ${color}${meta.status}${RESET}  |  Author: ${meta.author}${ownerPart}  |  Updated: ${meta.updated.slice(0, 10)}`
-  );
+  console.log(`Status: ${color}${meta.status}${RESET}  |  Author: ${meta.author}${ownerPart}  |  Updated: ${meta.updated.slice(0, 10)}`);
   const steps = meta.steps ?? [];
   if (steps.length > 0) {
     const done = steps.filter((s) => s.status === "completed").length;
@@ -54,15 +48,6 @@ function printHeader(meta: PlanMeta): void {
   if (meta.parent) console.log(`Parent: ${meta.parent}`);
   if (meta.repos.length) console.log(`Repos: ${meta.repos.join(", ")}`);
   if (meta.tags.length) console.log(`Tags: ${meta.tags.join(", ")}`);
-  if (meta.children.length) {
-    console.log(`\nChildren:`);
-    for (const child of meta.children) {
-      try {
-        // Sync read - we're in a print function, readMeta is async
-        // Use a placeholder; the async version is in the meta display path
-      } catch {}
-    }
-  }
 }
 
 async function printChildren(meta: PlanMeta): Promise<void> {
@@ -80,21 +65,82 @@ async function printChildren(meta: PlanMeta): Promise<void> {
   }
 }
 
-export async function cmdShow(slug: string | undefined, opts: { brief?: boolean; json?: boolean; meta?: boolean }): Promise<void> {
-  // No slug: interactive browser
-  if (!slug) {
-    const { pickPlanBrowse } = await import("../interactive.ts");
-    await pickPlanBrowse({ prompt: "show> " });
-    return;
+// --- Actions after viewing a plan ---
+
+const STATUS_ACTIONS: Record<string, { value: string; label: string }[]> = {
+  draft: [
+    { value: "in-review", label: "Submit for review" },
+    { value: "edit", label: "Edit in $EDITOR" },
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ],
+  "in-review": [
+    { value: "approved", label: "Approve" },
+    { value: "rejected", label: "Reject" },
+    { value: "edit", label: "Edit in $EDITOR" },
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ],
+  approved: [
+    { value: "executing", label: "Start executing" },
+    { value: "edit", label: "Edit in $EDITOR" },
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ],
+  executing: [
+    { value: "completed", label: "Mark completed" },
+    { value: "in-review", label: "Back to in-review" },
+    { value: "edit", label: "Edit in $EDITOR" },
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ],
+  completed: [
+    { value: "archived", label: "Archive" },
+    { value: "draft", label: "Reopen as draft" },
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ],
+  rejected: [
+    { value: "draft", label: "Reopen as draft" },
+    { value: "archived", label: "Archive" },
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ],
+  archived: [
+    { value: "draft", label: "Reopen as draft" },
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ],
+};
+
+async function promptAction(slug: string, status: string): Promise<"back" | "done"> {
+  const options = STATUS_ACTIONS[status] ?? [
+    { value: "back", label: "Back to list" },
+    { value: "done", label: "Done" },
+  ];
+
+  const action = await select({ message: "Action:", options });
+  if (typeof action !== "string") return "done";
+
+  if (action === "back" || action === "done") return action;
+
+  if (action === "edit") {
+    const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vi";
+    await Bun.$`${editor} ${planPath(slug)}`;
+    return "back";
   }
 
-  await showPlan(slug, opts);
+  // Status transition
+  await updateMeta(slug, { status: action as PlanStatus });
+  console.log(`${slug} → ${action}`);
+  return "back";
 }
+
+// --- Show a single plan ---
 
 async function showPlan(slug: string, opts: { brief?: boolean; json?: boolean; meta?: boolean }): Promise<void> {
   const meta = await readMeta(slug);
 
-  // --meta: plain text metadata
   if (opts.meta) {
     if (opts.json) {
       console.log(JSON.stringify(meta, null, 2));
@@ -135,17 +181,13 @@ async function showPlan(slug: string, opts: { brief?: boolean; json?: boolean; m
     return;
   }
 
-  // Print header
   printHeader(meta);
   await printChildren(meta);
 
-  // Print step progress
   const stepsDetail = formatStepsDetail(meta);
   if (stepsDetail) console.log(`\n${stepsDetail}`);
-
   console.log("");
 
-  // Render markdown body with ANSI colors
   let body = content;
   if (opts.brief) {
     const lines = content.split("\n");
@@ -154,73 +196,33 @@ async function showPlan(slug: string, opts: { brief?: boolean; json?: boolean; m
   }
 
   process.stdout.write(renderMarkdown(body) + "\n");
-
-  // Interactive actions (TTY only)
-  if (process.stdout.isTTY) {
-    await showActions(slug, meta.status);
-  }
 }
 
-async function showActions(slug: string, status: string): Promise<void> {
-  const { updateMeta } = await import("../../core/meta.ts");
+// --- Main command ---
 
-  const actions: string[] = [];
-
-  switch (status) {
-    case "draft":
-      actions.push("→  Submit for review", "✎  Edit", "⏎  Done");
-      break;
-    case "in-review":
-      actions.push("✓  Approve", "✗  Reject", "✎  Edit", "⏎  Done");
-      break;
-    case "approved":
-      actions.push("▶  Start executing", "✎  Edit", "⏎  Done");
-      break;
-    case "executing":
-      actions.push("✓  Mark completed", "⏸  Back to in-review", "✎  Edit", "⏎  Done");
-      break;
-    case "completed":
-      actions.push("📦  Archive", "↩  Reopen (draft)", "✎  Edit", "⏎  Done");
-      break;
-    case "rejected":
-      actions.push("↩  Reopen (draft)", "📦  Archive", "⏎  Done");
-      break;
-    case "archived":
-      actions.push("↩  Reopen (draft)", "⏎  Done");
-      break;
-  }
-
-  if (actions.length === 0) return;
-
-  const selected = await fzfSelect(actions, {
-    prompt: "action> ",
-    header: `${slug} (${status})`,
-  });
-
-  if (!selected || selected.includes("Done")) return;
-
-  const ACTION_MAP: [string, string][] = [
-    ["Approve", "approved"],
-    ["Reject", "rejected"],
-    ["Submit for review", "in-review"],
-    ["Start executing", "executing"],
-    ["Mark completed", "completed"],
-    ["Archive", "archived"],
-    ["Back to in-review", "in-review"],
-    ["Reopen", "draft"],
-  ];
-
-  for (const [label, newStatus] of ACTION_MAP) {
-    if (selected.includes(label)) {
-      await updateMeta(slug, { status: newStatus as any });
-      console.log(`${slug} → ${newStatus}`);
-      return;
+export async function cmdShow(slug: string | undefined, opts: { brief?: boolean; json?: boolean; meta?: boolean }): Promise<void> {
+  // Direct slug: show and optionally prompt for action
+  if (slug) {
+    await showPlan(slug, opts);
+    if (process.stdout.isTTY && !opts.json && !opts.meta) {
+      const meta = await readMeta(slug);
+      await promptAction(slug, meta.status);
     }
+    return;
   }
 
-  if (selected.includes("Edit")) {
-    const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vi";
-    const { planPath: pp } = await import("../../core/store.ts");
-    await Bun.$`${editor} ${pp(slug)}`;
+  // No slug: browse loop — fzf picks, we show + prompt, loop back
+  while (true) {
+    const picked = await pickSlug({ prompt: "show> " });
+    if (!picked) return; // Esc exits
+
+    await showPlan(picked, opts);
+
+    if (!process.stdout.isTTY) return;
+
+    const meta = await readMeta(picked);
+    const result = await promptAction(picked, meta.status);
+    if (result === "done") return;
+    // "back" → loop continues, fzf re-opens
   }
 }
