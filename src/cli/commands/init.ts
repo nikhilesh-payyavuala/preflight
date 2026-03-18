@@ -83,6 +83,30 @@ export async function cmdInit(url: string | undefined, opts: { path?: string }):
   });
 
   if (createRemote) {
+    // Fetch user + orgs to let user pick where to create the repo
+    let owner = "";
+    try {
+      const userResult = await Bun.$`gh api /user --jq '.login'`.quiet();
+      const username = userResult.stdout.toString().trim();
+      const orgsResult = await Bun.$`gh api /user/orgs --jq '.[].login'`.quiet();
+      const orgs = orgsResult.stdout.toString().trim().split("\n").filter(Boolean);
+
+      const ownerOptions = [
+        { value: username, label: `${username} (personal)` },
+        ...orgs.map((org) => ({ value: org, label: org })),
+      ];
+
+      if (ownerOptions.length > 1) {
+        const picked = await select({ message: "Create repo under:", options: ownerOptions });
+        if (typeof picked !== "string") { cancel("Cancelled."); process.exit(0); }
+        owner = picked;
+      } else {
+        owner = username;
+      }
+    } catch {
+      // gh not authenticated or no orgs — just use default
+    }
+
     const visibility = await select({
       message: "Repository visibility:",
       options: [
@@ -102,7 +126,8 @@ export async function cmdInit(url: string | undefined, opts: { path?: string }):
 
     try {
       const visFlag = visibility === "public" ? "--public" : "--private";
-      const result = await Bun.$`gh repo create ${repoName.trim()} ${visFlag} --source=${PREFLIGHT_DIR} --push --description "Preflight planning repo"`.quiet();
+      const fullName = owner ? `${owner}/${repoName.trim()}` : repoName.trim();
+      const result = await Bun.$`gh repo create ${fullName} ${visFlag} --source=${PREFLIGHT_DIR} --push --description "Preflight planning repo"`.quiet();
       const output = result.stdout.toString().trim();
       console.log(`  Created: ${output}`);
     } catch (e: any) {
