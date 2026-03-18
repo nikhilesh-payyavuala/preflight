@@ -7,6 +7,8 @@ import { cmdEdit } from "./commands/edit.ts";
 import { cmdUpdate } from "./commands/update.ts";
 import { cmdSearch } from "./commands/search.ts";
 import { cmdDelete } from "./commands/delete.ts";
+import { cmdPush } from "./commands/push.ts";
+import { cmdPull } from "./commands/pull.ts";
 import { cmdInstallSkills } from "./commands/install-skills.ts";
 
 const program = new Command()
@@ -14,10 +16,24 @@ const program = new Command()
   .description("Preflight — manage AI coding plans as first-class artifacts")
   .version("0.1.0");
 
+// --- Setup & sync ---
+
 program
-  .command("init")
-  .description("Initialize Preflight (~/.preflight/)")
+  .command("init [url]")
+  .description("Initialize Preflight, or clone a remote planning repo")
+  .option("-p, --path <path>", "Custom store path (default: ~/.preflight)")
   .action(cmdInit);
+
+program
+  .command("push")
+  .description("Commit and push plans to remote")
+  .option("-m, --message <msg>", "Commit message")
+  .action(cmdPush);
+
+program
+  .command("pull")
+  .description("Pull plans from remote and rebuild index")
+  .action(cmdPull);
 
 // --- Agent commands (no interactive prompts, require explicit args) ---
 
@@ -34,7 +50,7 @@ program
 
 program
   .command("search [query]")
-  .description("List/search plans (always text output, never interactive)")
+  .description("List/search plans")
   .option("-n, --limit <n>", "Max results", "20")
   .option("-s, --status <status>", "Filter by status")
   .option("-r, --repo <path>", "Filter by repo (. = current repo)")
@@ -84,7 +100,7 @@ program
   .option("--json", "Output JSON")
   .action(cmdShow);
 
-// --- Setup ---
+// --- Skills ---
 
 program
   .command("install-skills")

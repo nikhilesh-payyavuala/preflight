@@ -6,7 +6,23 @@ All commands require explicit arguments. No command prompts interactively.
 ## Commands
 
 ### pf init
-Initialize `~/.preflight/`. Run once.
+```bash
+pf init              # Initialize ~/.preflight/ as a git repo
+pf init <url>        # Clone a remote planning repo to ~/.preflight/
+pf init --path <p>   # Use a custom store path
+```
+
+### pf push
+```bash
+pf push [-m "<commit message>"]
+```
+Stages all changes in `~/.preflight/`, auto-commits, and pushes to remote.
+
+### pf pull
+```bash
+pf pull
+```
+Pulls from remote and rebuilds the search index.
 
 ### pf new
 ```bash
