@@ -2,9 +2,7 @@ import { DB_PATH, listSlugs } from "../../core/store.ts";
 import { readMeta } from "../../core/meta.ts";
 import { existsSync } from "fs";
 import { rebuildIndex, searchPlans } from "../../core/db.ts";
-import { pickSlug } from "../interactive.ts";
 import { STATUS_COLOR, RESET } from "../format.ts";
-import { cmdShow } from "./show.ts";
 
 export async function cmdSearch(
   query: string | undefined,
@@ -40,19 +38,11 @@ export async function cmdSearch(
       return;
     }
 
-    // Plain mode or non-TTY
-    if (opts.plain || !process.stdout.isTTY) {
-      for (const meta of filtered) {
-        const color = STATUS_COLOR[meta.status] ?? "";
-        const tags = meta.tags.length ? `  [${meta.tags.join(", ")}]` : "";
-        console.log(`${color}${meta.status.padEnd(10)}${RESET}  ${meta.slug}  —  ${meta.title}${tags}`);
-      }
-      return;
+    for (const meta of filtered) {
+      const color = STATUS_COLOR[meta.status] ?? "";
+      const tags = meta.tags.length ? `  [${meta.tags.join(", ")}]` : "";
+      console.log(`${color}${meta.status.padEnd(10)}${RESET}  ${meta.slug}  —  ${meta.title}${tags}`);
     }
-
-    // Interactive: pick a plan, show it (with actions)
-    const slug = await pickSlug();
-    if (slug) await cmdShow(slug, { brief: false });
     return;
   }
 

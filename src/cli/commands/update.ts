@@ -2,82 +2,11 @@ import { readMeta, writeMeta, syncStepsFromContent, updateStepStatus } from "../
 import { indexPlan } from "../../core/db.ts";
 import { planPath, planExists } from "../../core/store.ts";
 import { currentRepo } from "../../core/git.ts";
-import { resolveSlug } from "../interactive.ts";
-import { select, text } from "@clack/prompts";
 import type { PlanMeta, PlanStatus } from "../../types/index.ts";
-import { writeFileSync, unlinkSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
 
 const VALID_STATUSES: PlanStatus[] = [
-  "draft",
-  "in-review",
-  "approved",
-  "executing",
-  "completed",
-  "archived",
-  "rejected",
+  "draft", "in-review", "approved", "executing", "completed", "archived", "rejected",
 ];
-
-// --- Prompting helpers ---
-
-async function promptReviewBody(): Promise<string | null> {
-  const editor = process.env.EDITOR ?? process.env.VISUAL ?? null;
-
-  if (editor) {
-    const tmpFile = join(tmpdir(), `pf-review-${Date.now()}.md`);
-    writeFileSync(tmpFile, "\n\n# Write your review above this line. Save and close to submit.\n");
-    await Bun.$`${editor} ${tmpFile}`;
-    const raw = await Bun.file(tmpFile).text();
-    unlinkSync(tmpFile);
-    const body = raw.replace(/\n# Write your review.*$/s, "").trim();
-    return body || null;
-  }
-
-  const result = await text({ message: "Review body:" });
-  return typeof result === "string" ? result.trim() || null : null;
-}
-
-async function resolveReview(opts: { review?: string; by?: string }): Promise<{ by: string; body: string } | null> {
-  if (opts.review === undefined && !opts.by) return null;
-
-  let by = opts.by;
-  if (!by) {
-    const result = await text({ message: "Reviewer name:", placeholder: "your name or 'claude'" });
-    if (typeof result !== "string" || !result.trim()) process.exit(0);
-    by = result.trim();
-  }
-
-  let body = opts.review;
-  if (!body) {
-    body = await promptReviewBody() ?? undefined;
-    if (!body) { console.log("Aborted — empty review."); process.exit(0); }
-  }
-
-  return { by, body };
-}
-
-async function resolveStatus(opts: { status?: string }, hasOtherChanges: boolean): Promise<PlanStatus | null> {
-  let status = opts.status;
-
-  if (!status && !hasOtherChanges) {
-    const chosen = await select({
-      message: "New status:",
-      options: VALID_STATUSES.map((s) => ({ value: s, label: s })),
-    });
-    if (typeof chosen !== "string") process.exit(0);
-    status = chosen;
-  }
-
-  if (status && !VALID_STATUSES.includes(status as PlanStatus)) {
-    console.error(`Invalid status: ${status}. Valid: ${VALID_STATUSES.join(", ")}`);
-    process.exit(1);
-  }
-
-  return (status as PlanStatus) ?? null;
-}
-
-// --- Content mutation ---
 
 function appendReview(content: string, by: string, body: string): string {
   const date = new Date().toISOString().slice(0, 10);
@@ -96,8 +25,6 @@ function appendReview(content: string, by: string, body: string): string {
   return content + `\n## Reviews\n${entry}`;
 }
 
-// --- Meta mutation ---
-
 function applyMetaPatch(
   meta: PlanMeta,
   patch: {
@@ -112,7 +39,6 @@ function applyMetaPatch(
   }
 ): PlanMeta {
   const updated = { ...meta };
-
   if (patch.status) updated.status = patch.status;
   if (patch.title) updated.title = patch.title;
   if (patch.owner !== undefined) updated.owner = patch.owner;
@@ -124,12 +50,9 @@ function applyMetaPatch(
     const already = updated.prs.some((p) => p.repo === patch.addPr!.repo && p.number === patch.addPr!.number);
     if (!already) updated.prs = [...updated.prs, patch.addPr];
   }
-
   updated.updated = new Date().toISOString();
   return updated;
 }
-
-// --- Main command ---
 
 export async function cmdUpdate(
   slug: string | undefined,
@@ -149,63 +72,67 @@ export async function cmdUpdate(
     syncSteps?: boolean;
   }
 ): Promise<void> {
-  const resolved = await resolveSlug(slug, { prompt: "update> " });
-  if (!resolved) process.exit(0);
-
-  if (!planExists(resolved)) {
-    console.error(`Plan not found: ${resolved}`);
+  if (!slug) {
+    console.error("Missing required argument: <slug>");
+    console.error("Usage: pf update <slug> --status <status>");
+    process.exit(1);
+  }
+  if (!planExists(slug)) {
+    console.error(`Plan not found: ${slug}`);
     process.exit(1);
   }
 
   const messages: string[] = [];
 
-  // 1. Collect: resolve interactive inputs before any writes
-  const review = await resolveReview(opts);
-
-  let prPatch: { repo: string; number: number } | undefined;
-  if (opts.addPr) {
-    const prNum = parseInt(opts.addPr);
-    if (isNaN(prNum)) {
-      console.error(`Invalid PR number: ${opts.addPr}`);
-      process.exit(1);
-    }
-    const repo = await currentRepo() ?? process.cwd();
-    prPatch = { repo, number: prNum };
-  }
-
-  // Handle step operations (these write directly and return early if no other changes)
+  // Step operations
   if (opts.syncSteps) {
-    await syncStepsFromContent(resolved);
-    messages.push(`Steps synced from plan content: ${resolved}`);
+    await syncStepsFromContent(slug);
+    messages.push(`Steps synced: ${slug}`);
   }
   if (opts.completeStep) {
     const n = parseInt(opts.completeStep);
     if (isNaN(n)) { console.error(`Invalid step number: ${opts.completeStep}`); process.exit(1); }
-    await updateStepStatus(resolved, n, "completed");
-    messages.push(`Step ${n} marked completed: ${resolved}`);
+    await updateStepStatus(slug, n, "completed");
+    messages.push(`Step ${n} completed: ${slug}`);
   }
   if (opts.startStep) {
     const n = parseInt(opts.startStep);
     if (isNaN(n)) { console.error(`Invalid step number: ${opts.startStep}`); process.exit(1); }
-    await updateStepStatus(resolved, n, "in-progress");
-    messages.push(`Step ${n} marked in-progress: ${resolved}`);
+    await updateStepStatus(slug, n, "in-progress");
+    messages.push(`Step ${n} in-progress: ${slug}`);
   }
 
-  const hasStepChanges = !!(opts.syncSteps || opts.completeStep || opts.startStep);
-  const hasMetaChanges = !!(opts.addRepo || opts.removeRepo || opts.addTag || opts.removeTag || opts.title || opts.owner || prPatch);
-  const status = await resolveStatus(opts, hasMetaChanges || !!review || hasStepChanges);
-
-  // 2. Apply: write plan.md if review, then meta.yml once, then reindex once
-  if (review) {
-    const file = Bun.file(planPath(resolved));
+  // Review
+  if (opts.review) {
+    if (!opts.by) {
+      console.error("Missing --by <name> for review");
+      process.exit(1);
+    }
+    const file = Bun.file(planPath(slug));
     const content = await file.text();
-    await Bun.write(planPath(resolved), appendReview(content, review.by, review.body));
-    messages.push(`Review appended to: ${resolved}`);
+    await Bun.write(planPath(slug), appendReview(content, opts.by, opts.review));
+    messages.push(`Review appended: ${slug}`);
   }
 
-  const meta = await readMeta(resolved);
+  // PR linking
+  let prPatch: { repo: string; number: number } | undefined;
+  if (opts.addPr) {
+    const prNum = parseInt(opts.addPr);
+    if (isNaN(prNum)) { console.error(`Invalid PR number: ${opts.addPr}`); process.exit(1); }
+    const repo = await currentRepo() ?? process.cwd();
+    prPatch = { repo, number: prNum };
+  }
+
+  // Status validation
+  if (opts.status && !VALID_STATUSES.includes(opts.status as PlanStatus)) {
+    console.error(`Invalid status: ${opts.status}. Valid: ${VALID_STATUSES.join(", ")}`);
+    process.exit(1);
+  }
+
+  // Apply meta patch
+  const meta = await readMeta(slug);
   const patched = applyMetaPatch(meta, {
-    status,
+    status: (opts.status as PlanStatus) ?? null,
     title: opts.title,
     owner: opts.owner,
     addRepo: opts.addRepo,
@@ -215,15 +142,14 @@ export async function cmdUpdate(
     addPr: prPatch,
   });
 
-  // Only write if something actually changed
   if (JSON.stringify(meta) !== JSON.stringify({ ...patched, updated: meta.updated })) {
     await writeMeta(patched);
   }
 
-  if (prPatch) messages.push(`Linked PR #${prPatch.number} (${prPatch.repo}) to plan: ${resolved}`);
+  if (prPatch) messages.push(`Linked PR #${prPatch.number} (${prPatch.repo}): ${slug}`);
 
-  try { await indexPlan(resolved); } catch {}
+  try { await indexPlan(slug); } catch {}
 
-  messages.push(`Updated: ${resolved} (status: ${patched.status})`);
+  messages.push(`Updated: ${slug} (status: ${patched.status})`);
   for (const msg of messages) console.log(msg);
 }

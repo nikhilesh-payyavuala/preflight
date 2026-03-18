@@ -1,11 +1,9 @@
 import { mkdir } from "fs/promises";
 import { planDir, planPath, planExists, ensureStore } from "../../core/store.ts";
-import { newMeta, writeMeta, addChild, readMeta } from "../../core/meta.ts";
+import { newMeta, writeMeta, addChild } from "../../core/meta.ts";
 import { indexPlan, initDb } from "../../core/db.ts";
-import { currentRepo } from "../../core/git.ts";
-import { intro, text, outro, cancel } from "@clack/prompts";
 
-const PLAN_TEMPLATE = `## Context
+export const PLAN_TEMPLATE = `## Context
 
 <!-- Why are we doing this? What problem does it solve? Design decisions, tradeoffs, links to prior art. -->
 
@@ -43,67 +41,16 @@ export async function cmdNew(
     parent?: string;
   }
 ): Promise<void> {
-  // If all required args are present (agent mode), skip prompts
-  if (slug && opts.title) {
-    return runNew(slug, opts.title, opts);
+  if (!slug) {
+    console.error("Missing required argument: <slug>");
+    console.error("Usage: pf new <slug> --title <title> [--repo <path>] [--tags <a,b>] [--owner <name>] [--parent <slug>]");
+    process.exit(1);
   }
-
-  // Interactive mode
-  intro("New plan");
-
-  const resolvedSlug = slug ?? await (async () => {
-    const r = await text({
-      message: "Slug:",
-      placeholder: "auth-migration-oauth2",
-      validate: (v) => {
-        if (!v.match(/^[a-z0-9-]+$/)) return "Lowercase letters, numbers, hyphens only";
-        if (planExists(v)) return `Plan already exists: ${v}`;
-      },
-    });
-    if (typeof r !== "string") { cancel("Cancelled."); process.exit(0); }
-    return r;
-  })();
-
-  const resolvedTitle = opts.title ?? await (async () => {
-    const r = await text({ message: "Title:", placeholder: "Auth Migration to OAuth2" });
-    if (typeof r !== "string" || !r.trim()) { cancel("Cancelled."); process.exit(0); }
-    return r.trim();
-  })();
-
-  const detectedRepo = await currentRepo() ?? "";
-  const resolvedRepo = opts.repo ?? await (async () => {
-    const r = await text({
-      message: "Repo path:",
-      placeholder: detectedRepo || "leave blank to skip",
-      initialValue: detectedRepo,
-    });
-    return typeof r === "string" ? r.trim() : "";
-  })();
-
-  const resolvedTags = opts.tags ?? await (async () => {
-    const r = await text({
-      message: "Tags (comma-separated):",
-      placeholder: "auth, migration",
-    });
-    return typeof r === "string" ? r.trim() : "";
-  })();
-
-  outro(`Creating plan: ${resolvedSlug}`);
-
-  await runNew(resolvedSlug, resolvedTitle, {
-    repo: resolvedRepo || undefined,
-    tags: resolvedTags || undefined,
-    author: opts.author,
-    owner: opts.owner,
-    parent: opts.parent,
-  });
-}
-
-async function runNew(
-  slug: string,
-  title: string,
-  opts: { repo?: string; tags?: string; author?: string; owner?: string; parent?: string }
-): Promise<void> {
+  if (!opts.title) {
+    console.error("Missing required option: --title <title>");
+    console.error("Usage: pf new <slug> --title <title>");
+    process.exit(1);
+  }
   if (!slug.match(/^[a-z0-9-]+$/)) {
     console.error("Slug must be lowercase letters, numbers, and hyphens only.");
     process.exit(1);
@@ -112,8 +59,6 @@ async function runNew(
     console.error(`Plan already exists: ${slug}`);
     process.exit(1);
   }
-
-  // Validate parent exists before creating anything
   if (opts.parent && !planExists(opts.parent)) {
     console.error(`Parent plan not found: ${opts.parent}`);
     process.exit(1);
@@ -124,7 +69,7 @@ async function runNew(
 
   const repos = opts.repo ? [opts.repo] : [];
   const tags = opts.tags ? opts.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
-  const meta = newMeta(slug, title, opts.author ?? "agent", repos, tags, {
+  const meta = newMeta(slug, opts.title, opts.author ?? "agent", repos, tags, {
     owner: opts.owner,
     parent: opts.parent,
   });
@@ -132,7 +77,6 @@ async function runNew(
   await writeMeta(meta);
   await Bun.write(planPath(slug), PLAN_TEMPLATE);
 
-  // Wire parent ↔ child
   if (opts.parent) {
     await addChild(opts.parent, slug);
     console.log(`Created: ${slug} (child of ${opts.parent})`);
@@ -141,6 +85,5 @@ async function runNew(
   }
 
   try { initDb(); await indexPlan(slug); } catch {}
-
   console.log(`  ${planPath(slug)}`);
 }

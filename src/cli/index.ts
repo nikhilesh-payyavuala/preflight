@@ -19,10 +19,12 @@ program
   .description("Initialize Preflight (~/.preflight/)")
   .action(cmdInit);
 
+// --- Agent commands (no interactive prompts, require explicit args) ---
+
 program
-  .command("new [slug]")
-  .description("Scaffold a new plan (interactive if slug/title omitted)")
-  .option("-t, --title <title>", "Plan title")
+  .command("new <slug>")
+  .description("Create a new plan")
+  .requiredOption("-t, --title <title>", "Plan title")
   .option("-r, --repo <path>", "Associated repo path")
   .option("--tags <tags>", "Comma-separated tags")
   .option("--author <name>", "Author name (default: agent)")
@@ -32,33 +34,19 @@ program
 
 program
   .command("search [query]")
-  .description("Search plans (no query = list all)")
+  .description("List/search plans (always text output, never interactive)")
   .option("-n, --limit <n>", "Max results", "20")
   .option("-s, --status <status>", "Filter by status")
   .option("-r, --repo <path>", "Filter by repo (. = current repo)")
   .option("--tag <tag>", "Filter by tag")
   .option("--owner <name>", "Filter by owner")
-  .option("--plain", "Plain list output, no interactive picker")
   .option("--json", "Output JSON")
   .action((query, opts) =>
     cmdSearch(query, { ...opts, limit: parseInt(opts.limit) })
   );
 
 program
-  .command("show [slug]")
-  .description("Show a plan (TUI if no slug given)")
-  .option("-b, --brief", "Show only Context, Goals, and Reviews")
-  .option("-m, --meta", "Show metadata only")
-  .option("--json", "Output JSON")
-  .action(cmdShow);
-
-program
-  .command("edit [slug]")
-  .description("Open plan in $EDITOR (fzf picker if slug omitted)")
-  .action(cmdEdit);
-
-program
-  .command("update [slug]")
+  .command("update <slug>")
   .description("Update plan metadata, add reviews, or link PRs")
   .option("-s, --status <status>", "New status")
   .option("--title <title>", "New title")
@@ -76,15 +64,32 @@ program
   .action(cmdUpdate);
 
 program
-  .command("delete [slug]")
-  .description("Delete a plan (fzf picker if slug omitted)")
-  .option("-f, --force", "Skip confirmation")
+  .command("edit <slug>")
+  .description("Open plan.md in $EDITOR")
+  .action(cmdEdit);
+
+program
+  .command("delete <slug>")
+  .description("Delete a plan (requires -f)")
+  .option("-f, --force", "Confirm deletion")
   .action(cmdDelete);
+
+// --- Human command (interactive TUI) ---
+
+program
+  .command("show [slug]")
+  .description("View a plan. No slug = interactive browser with fzf")
+  .option("-b, --brief", "Show only Context, Goals, and Reviews")
+  .option("-m, --meta", "Show metadata only")
+  .option("--json", "Output JSON")
+  .action(cmdShow);
+
+// --- Setup ---
 
 program
   .command("install-skills")
   .description("Install Preflight skills into all detected IDEs and agents")
-  .option("--agent <name>", "Install to a specific agent only (claude, cursor, codex, gemini...)")
+  .option("--agent <name>", "Install to a specific agent only")
   .option("--all", "Install to all agents without prompts")
   .option("--fallback", "Skip skills CLI, use manual symlinks only")
   .action(cmdInstallSkills);

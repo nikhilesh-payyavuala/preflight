@@ -57,8 +57,8 @@ test("pf new rejects duplicate slug", async () => {
   expect(exitCode).not.toBe(0);
 });
 
-test("pf search --plain lists plans", async () => {
-  const { stdout, exitCode } = await pf("search", "--plain");
+test("pf search lists plans", async () => {
+  const { stdout, exitCode } = await pf("search");
   expect(exitCode).toBe(0);
   expect(stdout).toContain("test-smoke");
   expect(stdout).toContain("Smoke Test");
@@ -119,7 +119,7 @@ test("pf update --owner sets owner", async () => {
 });
 
 test("pf search with query finds plan", async () => {
-  const { stdout, exitCode } = await pf("search", "smoke", "--plain");
+  const { stdout, exitCode } = await pf("search", "smoke");
   expect(exitCode).toBe(0);
   expect(stdout).toContain("test-smoke");
 });
@@ -147,7 +147,7 @@ test("pf search --owner filters by owner", async () => {
   const r1 = await pf("new", "owner-test", "--title", "Owner Test", "--owner", "diana");
   if (r1.exitCode !== 0) console.log("NEW FAILED:", r1.stderr);
 
-  const r2 = await pf("search", "--owner", "diana", "--plain");
+  const r2 = await pf("search", "--owner", "diana");
   if (r2.exitCode !== 0) console.log("SEARCH FAILED:", r2.stderr.slice(0, 500));
 
   expect(r2.exitCode).toBe(0);

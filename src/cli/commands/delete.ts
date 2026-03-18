@@ -2,28 +2,27 @@ import { planDir, planExists, DB_PATH } from "../../core/store.ts";
 import { removePlanFromIndex } from "../../core/db.ts";
 import { rm } from "fs/promises";
 import { existsSync } from "fs";
-import { resolveSlug } from "../interactive.ts";
-import { confirm } from "@clack/prompts";
 
 export async function cmdDelete(slug: string | undefined, opts: { force?: boolean }): Promise<void> {
-  const resolved = await resolveSlug(slug, { prompt: "delete> " });
-  if (!resolved) process.exit(0);
-
-  if (!planExists(resolved)) {
-    console.error(`Plan not found: ${resolved}`);
+  if (!slug) {
+    console.error("Missing required argument: <slug>");
+    console.error("Usage: pf delete <slug> [-f]");
+    process.exit(1);
+  }
+  if (!planExists(slug)) {
+    console.error(`Plan not found: ${slug}`);
+    process.exit(1);
+  }
+  if (!opts.force) {
+    console.error("Use -f to confirm deletion: pf delete <slug> -f");
     process.exit(1);
   }
 
-  if (!opts.force) {
-    const ok = await confirm({ message: `Delete plan "${resolved}"? This cannot be undone.` });
-    if (!ok) { console.log("Aborted."); process.exit(0); }
-  }
-
-  await rm(planDir(resolved), { recursive: true, force: true });
+  await rm(planDir(slug), { recursive: true, force: true });
 
   if (existsSync(DB_PATH)) {
-    try { removePlanFromIndex(resolved); } catch {}
+    try { removePlanFromIndex(slug); } catch {}
   }
 
-  console.log(`Deleted: ${resolved}`);
+  console.log(`Deleted: ${slug}`);
 }
