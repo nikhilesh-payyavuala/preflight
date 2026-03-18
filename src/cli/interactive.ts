@@ -44,8 +44,8 @@ const STATUS_HEADER = "enter:open  ctrl-a:approve  ctrl-r:reject  ctrl-s:submit 
 
 // Extract slug from fzf line: awk '{print $3}'
 const SLUG_AWK = "echo {} | awk '{print $3}'";
-// Reload command: regenerate the plan list
-const RELOAD_CMD = "pf search --plain 2>/dev/null";
+// Reload command: regenerate the plan list in fzf-compatible format
+const RELOAD_CMD = "pf search --fzf 2>/dev/null";
 
 function statusBind(key: string, status: string): string {
   return `${key}:execute-silent(pf update $(${SLUG_AWK}) --status ${status})+reload(${RELOAD_CMD})`;

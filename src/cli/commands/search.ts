@@ -8,7 +8,7 @@ import { cmdShow } from "./show.ts";
 
 export async function cmdSearch(
   query: string | undefined,
-  opts: { limit?: number; json?: boolean; status?: string; repo?: string; tag?: string; owner?: string; plain?: boolean }
+  opts: { limit?: number; json?: boolean; status?: string; repo?: string; tag?: string; owner?: string; plain?: boolean; fzf?: boolean }
 ): Promise<void> {
   // No query = list all plans (absorbs old `pf list`)
   if (!query) {
@@ -37,6 +37,12 @@ export async function cmdSearch(
 
     if (filtered.length === 0) {
       console.log("No plans match the given filters.");
+      return;
+    }
+
+    // fzf mode — same format as formatPlanLine (used by fzf reload)
+    if (opts.fzf) {
+      for (const meta of filtered) console.log(formatPlanLine(meta));
       return;
     }
 
