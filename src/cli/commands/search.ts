@@ -2,8 +2,8 @@ import { DB_PATH, listSlugs } from "../../core/store.ts";
 import { readMeta } from "../../core/meta.ts";
 import { existsSync } from "fs";
 import { rebuildIndex, searchPlans } from "../../core/db.ts";
-import { pickPlan, extractSlugFromLine } from "../interactive.ts";
-import { formatPlanLine, STATUS_COLOR, RESET } from "../format.ts";
+import { pickPlan } from "../interactive.ts";
+import { formatPlanLine, formatPlanLineFzf, STATUS_COLOR, RESET } from "../format.ts";
 import { cmdShow } from "./show.ts";
 
 export async function cmdSearch(
@@ -40,9 +40,9 @@ export async function cmdSearch(
       return;
     }
 
-    // fzf mode — same format as formatPlanLine (used by fzf reload)
+    // fzf mode — tab-delimited: slug\tdisplay (used by fzf reload)
     if (opts.fzf) {
-      for (const meta of filtered) console.log(formatPlanLine(meta));
+      for (const meta of filtered) console.log(formatPlanLineFzf(meta));
       return;
     }
 

@@ -1,12 +1,16 @@
-import { listSlugs, planExists } from "../core/store.ts";
+import { listSlugs } from "../core/store.ts";
 import { readMeta } from "../core/meta.ts";
-import { formatPlanLine } from "./format.ts";
+import { formatPlanLineFzf } from "./format.ts";
 import type { PlanStatus } from "../types/index.ts";
 
-// Extract slug from a formatted plan line (3rd whitespace-separated token after icon and status)
-export function extractSlugFromLine(line: string): string | null {
-  const parts = line.trim().split(/\s+/);
-  return parts[2] ?? null;
+const STATUS_HEADER = "enter:open  ctrl-a:approve  ctrl-r:reject  ctrl-s:submit  ctrl-x:execute  ctrl-d:complete";
+
+// Reload command: regenerate the plan list in fzf format
+const RELOAD_CMD = "pf search --fzf 2>/dev/null";
+
+function statusBind(key: string, status: string): string {
+  // {1} is the slug (first tab-delimited field, hidden from display)
+  return `${key}:execute-silent(pf update {1} --status ${status})+reload(${RELOAD_CMD})`;
 }
 
 // Pipe a list of lines to fzf, return the selected line (or null if cancelled)
@@ -40,18 +44,7 @@ export async function fzfSelect(
   return output.trim() || null;
 }
 
-const STATUS_HEADER = "enter:open  ctrl-a:approve  ctrl-r:reject  ctrl-s:submit  ctrl-x:execute  ctrl-d:complete";
-
-// Extract slug from fzf line: awk '{print $3}'
-const SLUG_AWK = "echo {} | awk '{print $3}'";
-// Reload command: regenerate the plan list in fzf-compatible format
-const RELOAD_CMD = "pf search --fzf 2>/dev/null";
-
-function statusBind(key: string, status: string): string {
-  return `${key}:execute-silent(pf update $(${SLUG_AWK}) --status ${status})+reload(${RELOAD_CMD})`;
-}
-
-// Show an fzf picker over all plans. Status changes happen in-place via fzf --bind.
+// Show an fzf picker over all plans with inline status transitions.
 // Returns the slug selected with Enter, or null if cancelled.
 export async function pickPlan(opts: {
   prompt?: string;
@@ -76,14 +69,16 @@ export async function pickPlan(opts: {
     return null;
   }
 
-  const lines = filtered.map(formatPlanLine);
+  const lines = filtered.map(formatPlanLineFzf);
 
   const args = [
     "fzf", "--ansi", "--no-sort",
+    "--delimiter", "\t",
+    "--with-nth", "2..",           // Display: everything after the slug
+    "--preview", "pf show {1} --brief 2>/dev/null",  // {1} = slug
+    "--preview-window", "right:60%:wrap",
     "--prompt", opts.prompt ?? "plan> ",
     "--header", STATUS_HEADER,
-    "--preview", `pf show $(${SLUG_AWK}) --brief 2>/dev/null`,
-    "--preview-window", "right:60%:wrap",
     "--bind", statusBind("ctrl-a", "approved"),
     "--bind", statusBind("ctrl-r", "rejected"),
     "--bind", statusBind("ctrl-s", "in-review"),
@@ -106,7 +101,8 @@ export async function pickPlan(opts: {
   const output = (await new Response(proc.stdout).text()).trim();
   if (!output) return null;
 
-  return extractSlugFromLine(output);
+  // Output is the full line: "slug\tdisplay...". Extract slug.
+  return output.split("\t")[0] ?? null;
 }
 
 // Resolve a slug: use provided one, or launch picker
