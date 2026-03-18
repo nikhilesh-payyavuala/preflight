@@ -1,10 +1,9 @@
-import React from "react";
-import { render } from "ink";
 import { readMeta } from "../../core/meta.ts";
 import { planPath } from "../../core/store.ts";
-import { resolveSlug } from "../interactive.ts";
+import { resolveSlug, fzfSelect } from "../interactive.ts";
 import { STATUS_COLOR, RESET } from "../format.ts";
-import { PlanView } from "../../tui/PlanView.js";
+import { marked } from "marked";
+import { markedTerminal } from "marked-terminal";
 import type { PlanMeta } from "../../types/index.ts";
 
 const STEP_ICON = { pending: "○", "in-progress": "▶", completed: "✓" } as const;
@@ -17,9 +16,64 @@ function formatStepsDetail(meta: PlanMeta): string | null {
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     const icon = STEP_ICON[s.status] ?? "?";
-    lines.push(`  ${icon} ${i + 1}. ${s.title}`);
+    const color = s.status === "completed" ? "\x1b[32m" : s.status === "in-progress" ? "\x1b[36m" : "\x1b[90m";
+    lines.push(`  ${color}${icon} ${i + 1}. ${s.title}${RESET}`);
   }
   return lines.join("\n");
+}
+
+function renderMarkdown(content: string): string {
+  const origEnv = process.env.FORCE_COLOR;
+  process.env.FORCE_COLOR = "1";
+
+  marked.use(markedTerminal());
+  const result = (marked.parse(content) as string).trim();
+
+  if (origEnv === undefined) delete process.env.FORCE_COLOR;
+  else process.env.FORCE_COLOR = origEnv;
+
+  return result;
+}
+
+function printHeader(meta: PlanMeta): void {
+  const color = STATUS_COLOR[meta.status] ?? "";
+  console.log(`\x1b[1m${meta.title}\x1b[0m  \x1b[2m(${meta.slug})\x1b[0m`);
+  const ownerPart = meta.owner ? `  |  Owner: ${meta.owner}` : "";
+  console.log(
+    `Status: ${color}${meta.status}${RESET}  |  Author: ${meta.author}${ownerPart}  |  Updated: ${meta.updated.slice(0, 10)}`
+  );
+  const steps = meta.steps ?? [];
+  if (steps.length > 0) {
+    const done = steps.filter((s) => s.status === "completed").length;
+    console.log(`Steps: ${done}/${steps.length}`);
+  }
+  if (meta.parent) console.log(`Parent: ${meta.parent}`);
+  if (meta.repos.length) console.log(`Repos: ${meta.repos.join(", ")}`);
+  if (meta.tags.length) console.log(`Tags: ${meta.tags.join(", ")}`);
+  if (meta.children.length) {
+    console.log(`\nChildren:`);
+    for (const child of meta.children) {
+      try {
+        // Sync read - we're in a print function, readMeta is async
+        // Use a placeholder; the async version is in the meta display path
+      } catch {}
+    }
+  }
+}
+
+async function printChildren(meta: PlanMeta): Promise<void> {
+  if (meta.children.length === 0) return;
+  console.log(`\nChildren:`);
+  for (const child of meta.children) {
+    try {
+      const childMeta = await readMeta(child);
+      const cc = STATUS_COLOR[childMeta.status] ?? "";
+      const ow = childMeta.owner ? ` (${childMeta.owner})` : "";
+      console.log(`  ${cc}${childMeta.status.padEnd(10)}${RESET}  ${child}  —  ${childMeta.title}${ow}`);
+    } catch {
+      console.log(`  ?           ${child}  (not found)`);
+    }
+  }
 }
 
 export async function cmdShow(slug: string | undefined, opts: { brief?: boolean; json?: boolean; meta?: boolean }): Promise<void> {
@@ -27,7 +81,7 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
   if (!resolved) process.exit(0);
   const meta = await readMeta(resolved);
 
-  // --meta: plain text metadata (for agents and scripts)
+  // --meta: plain text metadata
   if (opts.meta) {
     if (opts.json) {
       console.log(JSON.stringify(meta, null, 2));
@@ -44,28 +98,12 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
     if (meta.repos.length) console.log(`repos:\n  ${meta.repos.join("\n  ")}`);
     if (meta.tags.length) console.log(`tags:    ${meta.tags.join(", ")}`);
     if (meta.parent) console.log(`parent:  ${meta.parent}`);
-    if (meta.children.length) {
-      console.log(`children:`);
-      for (const child of meta.children) {
-        try {
-          const childMeta = await readMeta(child);
-          const childColor = STATUS_COLOR[childMeta.status] ?? "";
-          const ownerLabel = childMeta.owner ? ` (${childMeta.owner})` : "";
-          console.log(`  ${childColor}${childMeta.status.padEnd(10)}${RESET}  ${child}  —  ${childMeta.title}${ownerLabel}`);
-        } catch {
-          console.log(`  ?           ${child}  (not found)`);
-        }
-      }
-    }
+    await printChildren(meta);
     if (meta.prs.length) {
       console.log(`prs:`);
-      for (const pr of meta.prs) {
-        console.log(`  #${pr.number} — ${pr.repo}`);
-      }
+      for (const pr of meta.prs) console.log(`  #${pr.number} — ${pr.repo}`);
     }
-    if (meta["depends-on"].length) {
-      console.log(`depends-on: ${meta["depends-on"].join(", ")}`);
-    }
+    if (meta["depends-on"].length) console.log(`depends-on: ${meta["depends-on"].join(", ")}`);
     const stepsDetail = formatStepsDetail(meta);
     if (stepsDetail) console.log(stepsDetail);
     return;
@@ -79,17 +117,30 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
 
   const content = await file.text();
 
-  // --json: machine-readable
   if (opts.json) {
     console.log(JSON.stringify({ meta, content }, null, 2));
     return;
   }
 
-  // Render with Ink for proper markdown
-  const { unmount } = render(
-    React.createElement(PlanView, { meta, content, brief: opts.brief })
-  );
-  unmount();
+  // Print header
+  printHeader(meta);
+  await printChildren(meta);
+
+  // Print step progress
+  const stepsDetail = formatStepsDetail(meta);
+  if (stepsDetail) console.log(`\n${stepsDetail}`);
+
+  console.log("");
+
+  // Render markdown body with ANSI colors
+  let body = content;
+  if (opts.brief) {
+    const lines = content.split("\n");
+    const implIdx = lines.findIndex((l) => l.match(/^## Implementation/i));
+    if (implIdx !== -1) body = lines.slice(0, implIdx).join("\n").trimEnd();
+  }
+
+  process.stdout.write(renderMarkdown(body) + "\n");
 
   // Interactive actions for actionable statuses (TTY only)
   if (process.stdout.isTTY && ["in-review", "draft", "approved"].includes(meta.status)) {
@@ -98,7 +149,6 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
 }
 
 async function showActions(slug: string, status: string): Promise<void> {
-  const { fzfSelect } = await import("../interactive.ts");
   const { updateMeta } = await import("../../core/meta.ts");
 
   const actions: string[] = [];
@@ -131,7 +181,7 @@ async function showActions(slug: string, status: string): Promise<void> {
     console.log(`Now executing: ${slug}`);
   } else if (selected.includes("Edit")) {
     const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vi";
-    const { planPath } = await import("../../core/store.ts");
-    await Bun.$`${editor} ${planPath(slug)}`;
+    const { planPath: pp } = await import("../../core/store.ts");
+    await Bun.$`${editor} ${pp(slug)}`;
   }
 }

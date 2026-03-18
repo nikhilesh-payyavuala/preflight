@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { marked } from "marked";
-import TerminalRenderer from "marked-terminal";
+import { markedTerminal } from "marked-terminal";
 import type { PlanMeta } from "../types/index.ts";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -17,8 +17,17 @@ const STATUS_COLOR: Record<string, string> = {
 const STEP_ICON = { pending: "○", "in-progress": "▶", completed: "✓" } as const;
 
 function renderMd(content: string): string {
-  marked.setOptions({ renderer: new TerminalRenderer() });
-  return (marked.parse(content) as string).trim();
+  // Force color output — marked-terminal checks tty and disables colors in pipes
+  const origEnv = process.env.FORCE_COLOR;
+  process.env.FORCE_COLOR = "1";
+
+  marked.use(markedTerminal());
+  const result = (marked.parse(content) as string).trim();
+
+  if (origEnv === undefined) delete process.env.FORCE_COLOR;
+  else process.env.FORCE_COLOR = origEnv;
+
+  return result;
 }
 
 export function PlanView({ meta, content, brief }: { meta: PlanMeta; content: string; brief?: boolean }) {
