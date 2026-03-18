@@ -68,14 +68,14 @@ test("pf show prints plan", async () => {
   const { stdout, exitCode } = await pf("show", "test-smoke");
   expect(exitCode).toBe(0);
   expect(stdout).toContain("Smoke Test");
-  expect(stdout).toContain("## Context");
+  expect(stdout).toContain("Context");
 });
 
 test("pf show --brief stops before Implementation", async () => {
   const { stdout, exitCode } = await pf("show", "test-smoke", "--brief");
   expect(exitCode).toBe(0);
-  expect(stdout).toContain("## Context");
-  expect(stdout).not.toContain("## Implementation");
+  expect(stdout).toContain("Context");
+  expect(stdout).not.toContain("Implementation");
 });
 
 test("pf show --meta prints metadata", async () => {

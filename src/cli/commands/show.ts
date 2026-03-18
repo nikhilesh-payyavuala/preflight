@@ -126,5 +126,23 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
   console.log("");
 
   const body = opts.brief ? extractBrief(content) : content;
-  console.log(body);
+  await renderMarkdown(body);
+}
+
+async function renderMarkdown(text: string): Promise<void> {
+  // Try glow first (best markdown rendering), then bat (syntax highlighting), then raw
+  for (const cmd of [
+    ["glow", "-"],
+    ["bat", "--language", "md", "--style", "plain", "--color", "always"],
+  ]) {
+    try {
+      const proc = Bun.spawn(cmd, { stdin: "pipe", stdout: "inherit", stderr: "ignore" });
+      proc.stdin.write(text);
+      proc.stdin.end();
+      const code = await proc.exited;
+      if (code === 0) return;
+    } catch {}
+  }
+  // Fallback: raw output
+  console.log(text);
 }
