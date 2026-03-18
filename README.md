@@ -17,18 +17,17 @@ The "plan first, execute second" workflow is how serious agentic coding works in
 # Install
 bun install -g  # from repo root, or: bun link
 
-# Initialize
+# Set up your planning repo (interactive — creates git repo, optionally GitHub)
 pf init
 
-# Create a plan
-pf new auth-migration --title "Auth Migration to OAuth2" --tags auth,migration
+# Install skills so your AI agents know how to create and execute plans
+pf install-skills
 
-# Browse plans interactively
-pf search
-
-# Show a plan
-pf show auth-migration --brief
+# Browse and manage plans
+pf show
 ```
+
+`pf show` is the human command — browse plans with fzf, view with rendered markdown, approve/reject/edit from an action menu. Agents use `pf new`, `pf update`, `pf search` directly (the skills teach them how).
 
 ## Plan Format
 
@@ -74,18 +73,25 @@ tags: [auth, migration]
 
 ## CLI Commands
 
+**Human commands:**
+
 | Command | Purpose |
 |---------|---------|
-| `pf init` | Set up `~/.preflight/` |
-| `pf new [slug]` | Create a plan (interactive if no args) |
-| `pf search [query]` | List/search plans with `--status`, `--repo`, `--tag`, `--owner` filters |
-| `pf show [slug]` | View a plan. `--brief` hides Implementation, `--meta` shows metadata |
-| `pf edit [slug]` | Open `plan.md` in `$EDITOR` |
-| `pf update [slug]` | Change status, tags, repos, owner. Append reviews with `--review` |
-| `pf delete [slug]` | Remove a plan |
-| `pf install-skills` | Install Preflight skills into Claude Code, Cursor, Codex, and 40+ agents |
+| `pf show` | Interactive browser — fzf picker, markdown view, approve/reject/edit |
+| `pf show <slug>` | View a single plan (also works for agents with `--json`/`--meta`) |
+| `pf init` | Interactive setup — create or clone a planning repo |
 
-All commands with `[slug]` launch an fzf picker when slug is omitted.
+**Agent commands** (used by skills, require explicit args):
+
+| Command | Purpose |
+|---------|---------|
+| `pf new <slug> --title "..."` | Create a plan |
+| `pf update <slug> --status approved` | Change status, tags, repos, reviews, step progress |
+| `pf search [query]` | List/search plans with `--status`, `--repo`, `--tag`, `--owner` filters |
+| `pf edit <slug>` | Open `plan.md` in `$EDITOR` |
+| `pf delete <slug> -f` | Remove a plan |
+| `pf push` / `pf pull` | Sync plans to/from remote git repo |
+| `pf install-skills` | Install skills into 40+ IDEs and agents |
 
 ## Plan Hierarchy
 
@@ -125,7 +131,7 @@ pf install-skills
 3. **Git-native.** History is git history.
 4. **Agent-agnostic.** Works with Claude Code, Cursor, Codex, Gemini CLI, or anything that accepts markdown.
 5. **Dual-audience.** Human context at the top, agent instructions at the bottom.
-6. **Lightweight for solo, powerful for teams.** `pf new && pf show` is all a solo dev needs.
+6. **Lightweight for solo, powerful for teams.** `pf init && pf install-skills` is all a solo dev needs.
 
 ## Docs
 
