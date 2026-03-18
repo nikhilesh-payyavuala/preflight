@@ -2,8 +2,9 @@ import { DB_PATH, listSlugs } from "../../core/store.ts";
 import { readMeta } from "../../core/meta.ts";
 import { existsSync } from "fs";
 import { rebuildIndex, searchPlans } from "../../core/db.ts";
-import { fzfSelect, extractSlugFromLine } from "../interactive.ts";
+import { fzfSelect, extractSlugFromLine, parseFzfExpect } from "../interactive.ts";
 import { formatPlanLine, STATUS_COLOR, RESET } from "../format.ts";
+import { updateMeta } from "../../core/meta.ts";
 import { cmdShow } from "./show.ts";
 
 export async function cmdSearch(
@@ -50,19 +51,40 @@ export async function cmdSearch(
       return;
     }
 
-    // Interactive fzf browser
+    // Interactive fzf browser with status transition keys
     const lines = filtered.map(formatPlanLine);
 
     const selected = await fzfSelect(lines, {
       prompt: "plans> ",
-      header: "Enter to open  ·  Ctrl-C to quit",
+      header: "enter:open  ctrl-a:approve  ctrl-r:reject  ctrl-s:submit  ctrl-x:execute  ctrl-d:complete",
       preview: "pf show $(echo {} | awk '{print $3}') --brief 2>/dev/null",
+      expectKeys: ["ctrl-a", "ctrl-r", "ctrl-s", "ctrl-x", "ctrl-d"],
     });
 
     if (!selected) return;
 
-    const selectedSlug = extractSlugFromLine(selected);
-    if (selectedSlug) await cmdShow(selectedSlug, { brief: false });
+    const parsed = parseFzfExpect(selected);
+    if (!parsed) return;
+
+    const slug = extractSlugFromLine(parsed.line);
+    if (!slug) return;
+
+    const STATUS_MAP: Record<string, string> = {
+      "ctrl-a": "approved",
+      "ctrl-r": "rejected",
+      "ctrl-s": "in-review",
+      "ctrl-x": "executing",
+      "ctrl-d": "completed",
+    };
+
+    if (parsed.key && STATUS_MAP[parsed.key]) {
+      const newStatus = STATUS_MAP[parsed.key];
+      await updateMeta(slug, { status: newStatus as any });
+      console.log(`${slug} → ${newStatus}`);
+    } else {
+      // Enter key — open the plan
+      await cmdShow(slug, { brief: false });
+    }
     return;
   }
 

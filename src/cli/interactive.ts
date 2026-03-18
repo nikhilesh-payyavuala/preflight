@@ -10,9 +10,10 @@ export function extractSlugFromLine(line: string): string | null {
 }
 
 // Pipe a list of lines to fzf, return the selected line (or null if cancelled)
+// When expectKeys is set, returns { key, line } where key is the pressed key.
 export async function fzfSelect(
   lines: string[],
-  opts: { preview?: string; prompt?: string; header?: string } = {}
+  opts: { preview?: string; prompt?: string; header?: string; expectKeys?: string[] } = {}
 ): Promise<string | null> {
   const args = ["fzf", "--ansi", "--no-sort"];
   if (opts.prompt) args.push("--prompt", opts.prompt);
@@ -22,6 +23,9 @@ export async function fzfSelect(
       "--preview", opts.preview,
       "--preview-window", "right:60%:wrap"
     );
+  }
+  if (opts.expectKeys?.length) {
+    args.push("--expect", opts.expectKeys.join(","));
   }
 
   const proc = Bun.spawn(args, {
@@ -34,10 +38,17 @@ export async function fzfSelect(
   proc.stdin.end();
 
   const exitCode = await proc.exited;
-  if (exitCode !== 0) return null; // user cancelled with Esc/Ctrl-C
+  if (exitCode !== 0) return null;
 
   const output = await new Response(proc.stdout).text();
   return output.trim() || null;
+}
+
+// fzf with --expect returns "key\nselected_line". Parse both.
+export function parseFzfExpect(output: string): { key: string; line: string } | null {
+  if (!output) return null;
+  const lines = output.split("\n");
+  return { key: lines[0] ?? "", line: lines[1] ?? "" };
 }
 
 // Show an fzf picker over all plans, return selected slug or null
