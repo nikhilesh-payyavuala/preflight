@@ -26,7 +26,9 @@ function renderMarkdown(content: string): string {
   const origEnv = process.env.FORCE_COLOR;
   process.env.FORCE_COLOR = "1";
 
-  marked.use(markedTerminal());
+  marked.use(markedTerminal({
+    showSectionPrefix: false,
+  }));
   const result = (marked.parse(content) as string).trim();
 
   if (origEnv === undefined) delete process.env.FORCE_COLOR;
