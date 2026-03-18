@@ -1,6 +1,6 @@
 import { readMeta } from "../../core/meta.ts";
 import { planPath } from "../../core/store.ts";
-import { resolveSlug, fzfSelect } from "../interactive.ts";
+import { fzfSelect } from "../interactive.ts";
 import { STATUS_COLOR, RESET } from "../format.ts";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
@@ -81,9 +81,18 @@ async function printChildren(meta: PlanMeta): Promise<void> {
 }
 
 export async function cmdShow(slug: string | undefined, opts: { brief?: boolean; json?: boolean; meta?: boolean }): Promise<void> {
-  const resolved = await resolveSlug(slug, { prompt: "show> " });
-  if (!resolved) process.exit(0);
-  const meta = await readMeta(resolved);
+  // No slug: interactive browser
+  if (!slug) {
+    const { pickPlanBrowse } = await import("../interactive.ts");
+    await pickPlanBrowse({ prompt: "show> " });
+    return;
+  }
+
+  await showPlan(slug, opts);
+}
+
+async function showPlan(slug: string, opts: { brief?: boolean; json?: boolean; meta?: boolean }): Promise<void> {
+  const meta = await readMeta(slug);
 
   // --meta: plain text metadata
   if (opts.meta) {
@@ -113,9 +122,9 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
     return;
   }
 
-  const file = Bun.file(planPath(resolved));
+  const file = Bun.file(planPath(slug));
   if (!(await file.exists())) {
-    console.error(`plan.md not found for: ${resolved}`);
+    console.error(`plan.md not found for: ${slug}`);
     process.exit(1);
   }
 
@@ -148,7 +157,7 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
 
   // Interactive actions (TTY only)
   if (process.stdout.isTTY) {
-    await showActions(resolved, meta.status);
+    await showActions(slug, meta.status);
   }
 }
 

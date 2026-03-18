@@ -3,7 +3,7 @@ import { readMeta } from "../core/meta.ts";
 import { formatPlanLineFzf } from "./format.ts";
 import type { PlanStatus } from "../types/index.ts";
 
-const STATUS_HEADER = "enter:open  ctrl-a:approve  ctrl-r:reject  ctrl-s:submit  ctrl-x:execute  ctrl-d:complete";
+const STATUS_HEADER = "⏎ open  ^a approve  ^r reject  ^s submit  ^x exec  ^d done";
 
 // Reload command: regenerate the plan list in fzf format
 const RELOAD_CMD = "pf search --fzf 2>/dev/null";
@@ -103,6 +103,54 @@ export async function pickPlan(opts: {
 
   // Output is the full line: "slug\tdisplay...". Extract slug.
   return output.split("\t")[0] ?? null;
+}
+
+// Browse mode: Enter opens plan full-screen inside fzf, then returns to picker.
+// Esc exits. Status keys work in-place. Nothing leaves fzf.
+export async function pickPlanBrowse(opts: {
+  prompt?: string;
+} = {}): Promise<void> {
+  const slugs = await listSlugs();
+  if (slugs.length === 0) {
+    console.error("No plans found. Run `pf new` to create one.");
+    return;
+  }
+
+  const metas = await Promise.all(
+    slugs.map((s) => readMeta(s).catch(() => null))
+  );
+  const filtered = metas.filter((m) => m !== null);
+  if (filtered.length === 0) return;
+
+  const lines = filtered.map(formatPlanLineFzf);
+
+  const args = [
+    "fzf", "--ansi", "--no-sort",
+    "--delimiter", "\t",
+    "--with-nth", "2..",
+    "--preview", "pf show {1} --brief 2>/dev/null",
+    "--preview-window", "right:60%:wrap",
+    "--prompt", opts.prompt ?? "plan> ",
+    "--header", STATUS_HEADER,
+    // Enter: open plan full-screen, return to picker after
+    "--bind", `enter:execute(pf show {1})+reload(${RELOAD_CMD})`,
+    "--bind", statusBind("ctrl-a", "approved"),
+    "--bind", statusBind("ctrl-r", "rejected"),
+    "--bind", statusBind("ctrl-s", "in-review"),
+    "--bind", statusBind("ctrl-x", "executing"),
+    "--bind", statusBind("ctrl-d", "completed"),
+  ];
+
+  const proc = Bun.spawn(args, {
+    stdin: "pipe",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  proc.stdin.write(lines.join("\n"));
+  proc.stdin.end();
+
+  await proc.exited;
 }
 
 // Resolve a slug: use provided one, or launch picker
