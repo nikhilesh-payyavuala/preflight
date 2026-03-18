@@ -5,113 +5,61 @@ description: Use when asked to review a plan, or before executing a plan that la
 
 # preflight:review-plan
 
-Review a plan critically before it gets approved or executed. The goal is to catch problems at plan-time, not code-review-time.
+Review a plan critically before it gets approved or executed. Catch problems at plan-time, not code-review-time.
+
+See [cli.md](../cli.md) for full CLI reference.
 
 ## Checklist
 
-1. **Read the full plan**
-2. **Check hierarchy** — read the parent spec if this is a child plan
-3. **Evaluate each section** against the criteria below
-4. **Write the review** — specific, actionable, attributed
-5. **Set recommendation** — approve or request changes
+1. Read the full plan
+2. Check hierarchy (parent/children)
+3. Evaluate each section
+4. Write the review
+5. Set status
 
-## Step 1 — Read the full plan
+## Step 1 — Read
 
 ```bash
 pf show <slug>
 pf show <slug> --meta
 ```
 
-Read everything: Context, Goals, Reviews (what prior reviewers said), Verification, Implementation. Check metadata for parent, children, and owner.
+If it has a parent, read the parent for context: `pf show <parent-slug> --brief`
 
-## Step 2 — Check hierarchy
+## Step 2 — Evaluate
 
-If this plan has a `parent`, read the parent spec:
-```bash
-pf show <parent-slug> --brief
-```
+**Context** — Is the WHY clear? Design decisions explained? Tradeoffs acknowledged?
 
-Verify that this plan's Goals are consistent with the parent spec's Goals. Flag any scope drift — the child plan should implement its portion, not redefine the overall initiative.
+**Goals** — Verifiable? ("users can log in via OAuth" not "improve auth"). Match the implementation scope?
 
-If this is a parent spec with children, check that the children collectively cover all the Goals:
-```bash
-pf show <slug> --meta   # lists children with statuses
-```
+**Verification** — Real, runnable commands? Cover happy path AND failures?
 
-## Step 3 — Evaluate
+**Implementation** — Steps specific enough to execute without context? File paths exact? Any step too large (>3 files)? Security concerns? Performance concerns? Cross-repo impacts?
 
-**Context**
-- [ ] Is the WHY clear? Would a new team member understand the motivation?
-- [ ] Are design decisions explained? (not just what, but why this approach)
-- [ ] Are tradeoffs acknowledged?
-- [ ] If child plan: does it reference the parent spec for broader context?
+**Ownership** — Owner set? Child plans properly delegated?
 
-**Goals**
-- [ ] Are all goals verifiable? ("users can log in via OAuth" ✓, "improve auth" ✗)
-- [ ] Do the goals match the Implementation scope? (no goal without an implementation step)
-- [ ] Are edge cases and failure modes in scope?
-- [ ] If child plan: are goals scoped to this plan's portion, not duplicating the parent?
+**Risk** — Rollback strategy needed? Feature flag? Irreversible operations?
 
-**Verification**
-- [ ] Are these real, runnable commands?
-- [ ] Do they cover the happy path AND key failure cases?
-- [ ] Would a passing verification suite actually mean the plan succeeded?
-
-**Implementation**
-- [ ] Is every step specific enough to execute without additional context?
-- [ ] Are file paths exact?
-- [ ] Are there hidden dependencies between steps that aren't called out?
-- [ ] Is any step too large? (a step that touches >3 files is probably too big)
-- [ ] Are there security concerns? (auth, input validation, SQL injection, secrets in code)
-- [ ] Are there performance concerns? (N+1 queries, missing indexes, unbounded loops)
-- [ ] Cross-repo impacts — does any step touch APIs consumed by other services?
-
-**Ownership**
-- [ ] Is the owner field set? (who is accountable for this plan?)
-- [ ] If multiple people are involved, are child plans properly delegated?
-
-**Risk**
-- [ ] Does this plan need a rollback strategy?
-- [ ] Is there a feature flag or migration path if things go wrong?
-- [ ] Does this touch anything irreversible (database migrations, external API calls, emails)?
-
-## Step 4 — Write the review
+## Step 3 — Write the review
 
 ```bash
-pf update <slug> \
-  --by "claude" \
-  --review "<your review text>"
-```
+pf update <slug> --by "claude" --review "APPROVE / REQUEST CHANGES / REJECT
 
-Review format:
-```
-APPROVE / REQUEST CHANGES / REJECT
-
-Summary: <1-2 sentences on overall assessment>
+Summary: <1-2 sentences>
 
 Issues:
-- [BLOCKING] <specific problem that must be fixed before execution>
-- [SUGGESTION] <improvement that would be nice but isn't required>
-
-Concerns:
-- <security/performance/reliability concern with specifics>
+- [BLOCKING] <must fix before execution>
+- [SUGGESTION] <nice to have>
 
 Questions:
-- <anything unclear that the plan author should clarify>
+- <anything unclear>"
 ```
 
-Be specific. "Step 2 is vague" is not useful. "Step 2 doesn't specify how to handle the case where the OAuth provider returns a profile without an email — this will cause a null pointer in user creation" is useful.
+Be specific. Not "Step 2 is vague" — instead "Step 2 doesn't handle the case where OAuth returns a profile without an email."
 
-## Step 5 — Set status
+## Step 4 — Set status
 
-If approving:
 ```bash
-pf update <slug> --status approved
+pf update <slug> --status approved    # if approving
+pf update <slug> --status draft       # if requesting changes
 ```
-
-If requesting changes:
-```bash
-pf update <slug> --status draft
-```
-
-(The author revises and resubmits with `pf update <slug> --status in-review`)

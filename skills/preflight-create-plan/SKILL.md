@@ -7,47 +7,35 @@ description: Use when starting a new coding task or feature — creates a struct
 
 Create a structured plan in Preflight before touching any code. The plan is the artifact — it outlives this conversation and is searchable, reviewable, and executable later.
 
+See [cli.md](../cli.md) for full CLI reference.
+
 ## Checklist
 
-1. **Search for existing plans** — run `pf search <keywords>` to avoid duplicates
+1. **Search for existing plans** — avoid duplicates
 2. **Check for a parent spec** — is this part of a larger initiative?
-3. **Investigate the codebase** — understand the scope before writing the plan
-4. **Determine repos** — identify all repos this plan touches
-5. **Scaffold the plan** — run `pf new`
-6. **Write the plan** — fill in all sections
-7. **Self-review** — verify the plan is complete and executable
-8. **Set status to in-review** — handoff to human or review agent
+3. **Investigate the codebase** — understand scope before writing
+4. **Scaffold the plan** — `pf new`
+5. **Write the plan** — fill in all sections of plan.md
+6. **Self-review** — verify completeness
+7. **Submit for review** — `pf update --status in-review`
 
-## Step 1 — Search for existing plans
+## Step 1 — Search first
 
 ```bash
 pf search "<keywords from task>"
-pf search --repo .
+pf search --repo "$(git rev-parse --show-toplevel)"
 ```
 
-If a relevant plan exists, consider updating it instead of creating a new one.
+If a relevant plan exists, update it instead of creating a new one. If a parent spec exists, create a child plan with `--parent`.
 
-If you find a parent spec that covers this work, create your plan as a child of it (Step 3).
-
-## Step 2 — Check for a parent spec
-
-Ask yourself: is this task part of a larger initiative? If someone has already created a spec for the broader feature, your plan should be a child of it.
-
-```bash
-pf search "<broader feature keywords>"
-```
-
-If you find a parent spec, note its slug for `--parent` in Step 3.
-
-## Step 3 — Investigate the codebase
+## Step 2 — Investigate the codebase
 
 Before writing anything:
 - Read relevant files, configs, and existing patterns
-- Understand what already exists vs. what needs to be built
 - Identify all files that will be created or modified
-- Note any dependencies, constraints, or risks
+- Note dependencies, constraints, and risks
 
-## Step 4 — Scaffold the plan
+## Step 3 — Scaffold
 
 ```bash
 pf new <slug> \
@@ -59,60 +47,33 @@ pf new <slug> \
   --parent "<parent-spec-slug>"
 ```
 
-Slug rules: lowercase, hyphens only, descriptive (`auth-migration-oauth2` not `plan1`).
+Slug: lowercase, hyphens, descriptive (`auth-migration-oauth2` not `plan1`).
 
-**`--owner`** is the human responsible for this plan. If you know who requested the work, set them as owner. If you don't know, omit it — the human can set it later with `pf update <slug> --owner <name>`.
+## Step 4 — Write the plan
 
-**`--parent`** creates a child plan linked to a parent spec. The parent's `children` list is automatically updated. Use this when your plan implements one part of a larger spec.
+Write directly to `~/.preflight/plans/<slug>/plan.md`:
 
-If the plan touches multiple repos, add them after:
-```bash
-pf update <slug> --add-repo /path/to/other/repo
-```
+**Context** — Why. Problem, design decisions, tradeoffs. If child plan, reference parent: "See [parent-slug] for full context."
 
-## Step 5 — Write the plan
+**Goals** — What "done" looks like. Prose, not checkboxes.
 
-The plan lives at `~/.preflight/plans/<slug>/plan.md`. Write all sections:
+**Reviews** — Leave empty. Appended by `pf update --review`.
 
-**Context** — Why this is being done. What problem it solves. Key design decisions and tradeoffs. If this is a child plan, reference the parent: "See [parent-slug] for full context." Only add context specific to this plan's scope.
+**Verification** — Concrete commands with expected outputs.
 
-**Goals** — What does "done" look like? Success criteria, scope boundaries, acceptance criteria. Write as prose or bullet points — not checkboxes. A human should be able to glance at these and understand the scope.
+**Implementation** — Numbered steps (`### Step N: title`). Each step names exact files and has enough detail for an agent with no prior context.
 
-**Reviews** — Leave this section empty. Reviews are appended by `pf update --review`.
+## Step 5 — Self-review
 
-**Verification** — Concrete commands with expected outputs. The executing agent runs these after finishing. Examples:
-```
-- `bun test src/auth/` — all 12 tests pass
-- `curl -I localhost:3000/auth/google` — 302 redirect to Google
-```
+Before submitting, verify:
+- Context explains WHY, not just what
+- Every goal is verifiable
+- Verification commands are real and runnable
+- Every implementation step names exact files
+- No step is too large to be atomic
 
-**Implementation** — Numbered steps. Each step:
-- Has a descriptive title
-- Lists exact files to create or modify with line ranges if relevant
-- Contains enough prose that an agent with no prior context can execute it
-- Includes specific code patterns, library choices, or constraints
-
-Write steps so they can be executed independently if needed. Avoid vague instructions like "add error handling" — be specific about what errors and how to handle them.
-
-**For specs (parent plans with no Implementation):** You may omit the Implementation and Verification sections entirely. A spec is a plan with only Context + Goals — it defines what to build and why, leaving the how to child plans.
-
-## Step 6 — Self-review before submitting
-
-Before marking in-review, verify:
-- [ ] Context explains WHY, not just what
-- [ ] Every Goal is verifiable (not "improve performance" — "p99 latency < 200ms")
-- [ ] Verification commands are real and runnable
-- [ ] Every Implementation step names exact files
-- [ ] No step is so large it can't be done atomically
-- [ ] Cross-repo dependencies are called out explicitly
-- [ ] If this is a child plan, the parent slug is set
-
-## Step 7 — Submit for review
+## Step 6 — Submit
 
 ```bash
 pf update <slug> --status in-review
 ```
-
-Then either:
-- Tell the human the plan is ready: `pf show <slug> --brief`
-- Or invoke `preflight:review-plan` to do an agent self-review first

@@ -5,130 +5,91 @@ description: Use when asked to implement a feature or task that has an approved 
 
 # preflight:execute-plan
 
-Execute an approved plan. Follow it exactly. Do not improvise beyond what's written. If you discover the plan is wrong or incomplete, stop and update the plan rather than silently deviating.
+Execute an approved plan. Follow it exactly. If the plan is wrong, stop and update it rather than silently deviating.
+
+See [cli.md](../cli.md) for full CLI reference.
 
 ## Checklist
 
-1. **Load and read the plan**
-2. **Check parent context if child plan**
-3. **Verify it's approved**
-4. **Mark as executing**
-5. **Execute each step**
-6. **Run verification**
-7. **Mark as completed and link PRs**
+1. Load the plan
+2. Check parent context
+3. Verify status is approved
+4. Mark as executing + sync steps
+5. Execute each step (with checkpoints)
+6. Run verification
+7. Mark completed + link PRs
 
-## Step 1 — Load the plan
+## Step 1 — Load
 
 ```bash
 pf show <slug>
 ```
 
-Read the entire plan. Understand the Context before touching any code. Know what the Goals are. Understand what Verification will look like at the end.
-
-If you weren't given a slug, search first:
+If you don't have a slug:
 ```bash
-pf search "<task description>"
 pf search --status approved --repo "$(git rev-parse --show-toplevel)"
 ```
 
-## Step 2 — Check parent context
+## Step 2 — Check parent
 
 ```bash
 pf show <slug> --meta
 ```
 
-If the plan has a `parent` field, read the parent spec for broader context:
-```bash
-pf show <parent-slug> --brief
-```
+If parent exists, read it for broader context: `pf show <parent-slug> --brief`
 
-The parent spec's Context and Goals frame the overall initiative. Your plan's Implementation is one piece of it. Understanding the parent helps you make better judgment calls when steps are ambiguous.
+## Step 3 — Verify approved
 
-## Step 3 — Verify it's approved
+Status must be `approved`. If not, stop and tell the human.
 
-Status must be `approved`. If it's `draft` or `in-review`, stop and tell the human the plan needs review before execution.
-
-If there are reviews, read them. They may contain important constraints or decisions that override the original Implementation steps.
-
-## Step 4 — Mark as executing and sync steps
+## Step 4 — Start
 
 ```bash
 pf update <slug> --status executing
 pf update <slug> --sync-steps
 ```
 
-The `--sync-steps` command extracts implementation steps from `plan.md` into trackable steps in `meta.yml`. You will mark each step complete as you go.
-
 ## Step 5 — Execute steps
 
-Work through the Implementation section top to bottom. For EACH step:
+For EACH implementation step:
 
-1. Mark the step as in-progress:
+1. Mark in-progress:
    ```bash
    pf update <slug> --start-step N
    ```
-2. Read the step fully before starting
-3. Check the files listed — read them if they exist to understand current state
-4. Implement exactly what the step says
-5. If a step is ambiguous, use the Context and Goals sections (and parent spec if any) to resolve it
-6. If a step is impossible as written (dependency missing, file doesn't exist, etc.) — **stop**. Do not guess. Append to Reviews explaining the blocker, set status back to `in-review`, and tell the human.
-7. Mark the step as completed:
+2. Read the step fully
+3. Implement exactly what it says
+4. If blocked — stop, don't guess:
+   ```bash
+   pf update <slug> --review "Blocked on Step N: <reason>" --by claude
+   pf update <slug> --status in-review
+   ```
+5. Mark completed:
    ```bash
    pf update <slug> --complete-step N
    ```
-8. **ONLY THEN proceed to Step N+1.**
+6. **Do not proceed to Step N+1 until you have run --complete-step.**
 
-You can check your progress at any point:
+**Do not** skip steps, add unplanned features, refactor unrelated code, or change the approach without updating the plan.
+
+## Step 6 — Verify
+
+Run every command in the Verification section. If any fail, debug and fix. If the fix is non-trivial, document it:
 ```bash
-pf show <slug> --meta
+pf update <slug> --review "Fixed: <what changed and why>" --by claude
 ```
-
-**Do not:**
-- Skip steps because they "seem obvious"
-- Add features not in the plan
-- Refactor code unrelated to the step
-- Change the approach without updating the plan first
-- Proceed to the next step without running `--complete-step`
-
-## Step 6 — Run verification
-
-After all steps are complete, run every command in the Verification section:
-
-```bash
-# Run each command listed under ## Verification
-# Confirm the expected output matches
-```
-
-If any verification fails:
-1. Debug and fix before proceeding
-2. If the fix is non-trivial, append to Reviews explaining what changed and why
-3. Only mark complete when all verifications pass
 
 ## Step 7 — Complete
 
 ```bash
-# Mark completed
 pf update <slug> --status completed
-
-# Link the PR (after creating it)
 pf update <slug> --add-pr <number>
+pf update <slug> --review "Completed. All verifications passed. PR #<n>." --by claude
 ```
 
-Append a completion note:
+## Deviations
+
+If you deviate from the plan, record it:
 ```bash
-pf update <slug> \
-  --by "claude" \
-  --review "Completed. All verification checks passed. PR #<number> created."
+pf update <slug> --review "Deviated from Step 3: plan assumed X but codebase uses Y. Used Y instead." --by claude
 ```
-
-## If you deviate from the plan
-
-Deviations happen. When they do, be explicit:
-
-```bash
-pf update <slug> \
-  --by "claude" \
-  --review "Deviated from Step 3: the plan assumed X but the codebase uses Y pattern. Used Y instead. All tests still pass."
-```
-
-The plan is a record. Keep it accurate.
