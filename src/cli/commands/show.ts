@@ -29,7 +29,9 @@ function renderMarkdown(content: string): string {
   marked.use(markedTerminal({
     showSectionPrefix: false,
   }));
-  const result = (marked.parse(content) as string).trim();
+  const result = (marked.parse(content) as string)
+    .replace(/^( *)(\* )/gm, "$1- ")
+    .trim();
 
   if (origEnv === undefined) delete process.env.FORCE_COLOR;
   else process.env.FORCE_COLOR = origEnv;
