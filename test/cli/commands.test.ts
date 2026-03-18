@@ -167,3 +167,48 @@ test("pf delete removes main test plan", async () => {
   expect(exitCode).toBe(0);
   expect(existsSync(join(tmpDir, ".preflight", "plans", "test-smoke"))).toBe(false);
 });
+
+// --- Step tracking tests ---
+
+test("pf steps: sync, start, complete", async () => {
+  // Create a plan and write content with implementation steps
+  await pf("new", "steps-test", "--title", "Steps Test");
+  const planFile = join(tmpDir, ".preflight", "plans", "steps-test", "plan.md");
+  await Bun.write(planFile, `## Context\n\nTest\n\n## Implementation\n\n### Step 1: First thing\n\nDo it.\n\n### Step 2: Second thing\n\nDo it too.\n\n### Step 3: Third thing\n\nDone.\n`);
+
+  // Sync steps from content
+  const r1 = await pf("update", "steps-test", "--sync-steps");
+  expect(r1.exitCode).toBe(0);
+
+  // Verify steps show up in meta
+  const r2 = await pf("show", "steps-test", "--meta");
+  expect(r2.stdout).toContain("0/3");
+  expect(r2.stdout).toContain("First thing");
+  expect(r2.stdout).toContain("Second thing");
+  expect(r2.stdout).toContain("Third thing");
+
+  // Start step 1
+  const r3 = await pf("update", "steps-test", "--start-step", "1");
+  expect(r3.exitCode).toBe(0);
+  const r4 = await pf("show", "steps-test", "--meta");
+  expect(r4.stdout).toContain("▶");
+
+  // Complete step 1
+  const r5 = await pf("update", "steps-test", "--complete-step", "1");
+  expect(r5.exitCode).toBe(0);
+  const r6 = await pf("show", "steps-test", "--meta");
+  expect(r6.stdout).toContain("1/3");
+  expect(r6.stdout).toContain("✓");
+
+  // Complete all
+  await pf("update", "steps-test", "--complete-step", "2");
+  await pf("update", "steps-test", "--complete-step", "3");
+  const r7 = await pf("show", "steps-test", "--meta");
+  expect(r7.stdout).toContain("3/3");
+
+  // Invalid step number
+  const r8 = await pf("update", "steps-test", "--complete-step", "99");
+  expect(r8.exitCode).not.toBe(0);
+
+  await pf("delete", "steps-test", "-f");
+});

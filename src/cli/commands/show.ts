@@ -2,6 +2,29 @@ import { readMeta } from "../../core/meta.ts";
 import { planPath, planExists } from "../../core/store.ts";
 import { resolveSlug } from "../interactive.ts";
 import { STATUS_COLOR, RESET } from "../format.ts";
+import type { PlanMeta } from "../../types/index.ts";
+
+const STEP_ICON = { pending: "○", "in-progress": "▶", completed: "✓" } as const;
+
+function formatStepsSummary(meta: PlanMeta): string | null {
+  const steps = meta.steps ?? [];
+  if (steps.length === 0) return null;
+  const done = steps.filter((s) => s.status === "completed").length;
+  return `${done}/${steps.length}`;
+}
+
+function formatStepsDetail(meta: PlanMeta): string | null {
+  const steps = meta.steps ?? [];
+  if (steps.length === 0) return null;
+  const done = steps.filter((s) => s.status === "completed").length;
+  const lines = [`steps:   ${done}/${steps.length} completed`];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const icon = STEP_ICON[s.status] ?? "?";
+    lines.push(`  ${icon} ${i + 1}. ${s.title}`);
+  }
+  return lines.join("\n");
+}
 
 // In brief mode, only print up to and including the ## Reviews section
 function extractBrief(content: string): string {
@@ -57,6 +80,8 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
     if (meta["depends-on"].length) {
       console.log(`depends-on: ${meta["depends-on"].join(", ")}`);
     }
+    const stepsDetail = formatStepsDetail(meta);
+    if (stepsDetail) console.log(stepsDetail);
     return;
   }
 
@@ -80,6 +105,8 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
   console.log(
     `Status: ${color}${meta.status}${RESET}  |  Author: ${meta.author}${ownerPart}  |  Updated: ${meta.updated.slice(0, 10)}`
   );
+  const stepsSummary = formatStepsSummary(meta);
+  if (stepsSummary) console.log(`Steps: ${stepsSummary}`);
   if (meta.parent) console.log(`Parent: ${meta.parent}`);
   if (meta.repos.length) console.log(`Repos: ${meta.repos.join(", ")}`);
   if (meta.tags.length) console.log(`Tags: ${meta.tags.join(", ")}`);

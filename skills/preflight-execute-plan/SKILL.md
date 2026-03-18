@@ -50,27 +50,45 @@ Status must be `approved`. If it's `draft` or `in-review`, stop and tell the hum
 
 If there are reviews, read them. They may contain important constraints or decisions that override the original Implementation steps.
 
-## Step 4 — Mark as executing
+## Step 4 — Mark as executing and sync steps
 
 ```bash
 pf update <slug> --status executing
+pf update <slug> --sync-steps
 ```
+
+The `--sync-steps` command extracts implementation steps from `plan.md` into trackable steps in `meta.yml`. You will mark each step complete as you go.
 
 ## Step 5 — Execute steps
 
-Work through the Implementation section top to bottom. For each step:
+Work through the Implementation section top to bottom. For EACH step:
 
-1. Read the step fully before starting
-2. Check the files listed — read them if they exist to understand current state
-3. Implement exactly what the step says
-4. If a step is ambiguous, use the Context and Goals sections (and parent spec if any) to resolve it
-5. If a step is impossible as written (dependency missing, file doesn't exist, etc.) — **stop**. Do not guess. Append to Reviews explaining the blocker, set status back to `in-review`, and tell the human.
+1. Mark the step as in-progress:
+   ```bash
+   pf update <slug> --start-step N
+   ```
+2. Read the step fully before starting
+3. Check the files listed — read them if they exist to understand current state
+4. Implement exactly what the step says
+5. If a step is ambiguous, use the Context and Goals sections (and parent spec if any) to resolve it
+6. If a step is impossible as written (dependency missing, file doesn't exist, etc.) — **stop**. Do not guess. Append to Reviews explaining the blocker, set status back to `in-review`, and tell the human.
+7. Mark the step as completed:
+   ```bash
+   pf update <slug> --complete-step N
+   ```
+8. **ONLY THEN proceed to Step N+1.**
+
+You can check your progress at any point:
+```bash
+pf show <slug> --meta
+```
 
 **Do not:**
 - Skip steps because they "seem obvious"
 - Add features not in the plan
 - Refactor code unrelated to the step
 - Change the approach without updating the plan first
+- Proceed to the next step without running `--complete-step`
 
 ## Step 6 — Run verification
 

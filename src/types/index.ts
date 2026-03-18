@@ -7,6 +7,13 @@ export type PlanStatus =
   | "archived"
   | "rejected";
 
+export type StepStatus = "pending" | "in-progress" | "completed";
+
+export interface PlanStep {
+  title: string;
+  status: StepStatus;
+}
+
 export interface PlanPR {
   repo: string;
   number: number;
@@ -25,6 +32,7 @@ export interface PlanMeta {
   prs: PlanPR[];
   parent: string | null;
   children: string[];
+  steps: PlanStep[];
   "depends-on": string[];
 }
 

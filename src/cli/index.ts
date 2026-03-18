@@ -70,6 +70,9 @@ program
   .option("--add-pr <number>", "Link a PR number")
   .option("--review <text>", "Append a review")
   .option("--by <name>", "Reviewer name (with --review)")
+  .option("--complete-step <n>", "Mark step N as completed")
+  .option("--start-step <n>", "Mark step N as in-progress")
+  .option("--sync-steps", "Re-extract steps from plan.md")
   .action(cmdUpdate);
 
 program

@@ -1,4 +1,4 @@
-import { readMeta, writeMeta } from "../../core/meta.ts";
+import { readMeta, writeMeta, syncStepsFromContent, updateStepStatus } from "../../core/meta.ts";
 import { indexPlan } from "../../core/db.ts";
 import { planPath, planExists } from "../../core/store.ts";
 import { currentRepo } from "../../core/git.ts";
@@ -144,6 +144,9 @@ export async function cmdUpdate(
     addPr?: string;
     review?: string;
     by?: string;
+    completeStep?: string;
+    startStep?: string;
+    syncSteps?: boolean;
   }
 ): Promise<void> {
   const resolved = await resolveSlug(slug, { prompt: "update> " });
@@ -170,8 +173,27 @@ export async function cmdUpdate(
     prPatch = { repo, number: prNum };
   }
 
+  // Handle step operations (these write directly and return early if no other changes)
+  if (opts.syncSteps) {
+    await syncStepsFromContent(resolved);
+    messages.push(`Steps synced from plan content: ${resolved}`);
+  }
+  if (opts.completeStep) {
+    const n = parseInt(opts.completeStep);
+    if (isNaN(n)) { console.error(`Invalid step number: ${opts.completeStep}`); process.exit(1); }
+    await updateStepStatus(resolved, n, "completed");
+    messages.push(`Step ${n} marked completed: ${resolved}`);
+  }
+  if (opts.startStep) {
+    const n = parseInt(opts.startStep);
+    if (isNaN(n)) { console.error(`Invalid step number: ${opts.startStep}`); process.exit(1); }
+    await updateStepStatus(resolved, n, "in-progress");
+    messages.push(`Step ${n} marked in-progress: ${resolved}`);
+  }
+
+  const hasStepChanges = !!(opts.syncSteps || opts.completeStep || opts.startStep);
   const hasMetaChanges = !!(opts.addRepo || opts.removeRepo || opts.addTag || opts.removeTag || opts.title || opts.owner || prPatch);
-  const status = await resolveStatus(opts, hasMetaChanges || !!review);
+  const status = await resolveStatus(opts, hasMetaChanges || !!review || hasStepChanges);
 
   // 2. Apply: write plan.md if review, then meta.yml once, then reindex once
   if (review) {

@@ -56,6 +56,10 @@ function indexPlanWithDb(db: Database, slug: string, meta: { title: string; tags
 }
 
 export async function indexPlan(slug: string): Promise<void> {
+  // Sync steps from plan content before indexing
+  const { syncStepsFromContent } = await import("./meta.ts");
+  await syncStepsFromContent(slug).catch(() => {});
+
   const db = getDb();
   const meta = await readMeta(slug);
   const planFile = Bun.file(join(PLANS_DIR, slug, "plan.md"));
