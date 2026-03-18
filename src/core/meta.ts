@@ -10,7 +10,24 @@ export async function readMeta(slug: string): Promise<PlanMeta> {
     throw new Error(`Plan not found: ${slug}`);
   }
   const text = await file.text();
-  return parse(text) as PlanMeta;
+  const raw = parse(text) ?? {};
+  // Normalize: fill in fields that may be missing from older plans
+  return {
+    slug: raw.slug ?? slug,
+    title: raw.title ?? "",
+    status: raw.status ?? "draft",
+    created: raw.created ?? "",
+    updated: raw.updated ?? "",
+    author: raw.author ?? "",
+    owner: raw.owner ?? "",
+    repos: raw.repos ?? [],
+    tags: raw.tags ?? [],
+    prs: raw.prs ?? [],
+    parent: raw.parent ?? null,
+    children: raw.children ?? [],
+    steps: raw.steps ?? [],
+    "depends-on": raw["depends-on"] ?? [],
+  } as PlanMeta;
 }
 
 export async function writeMeta(meta: PlanMeta): Promise<void> {
