@@ -18,7 +18,8 @@ export async function cmdSearch(
       return;
     }
 
-    const metas = await Promise.all(slugs.map((s) => readMeta(s)));
+    const results = await Promise.all(slugs.map((s) => readMeta(s).catch(() => null)));
+    const metas = results.filter((m) => m !== null);
     let filtered = metas;
 
     if (opts.status) filtered = filtered.filter((m) => m.status === opts.status);

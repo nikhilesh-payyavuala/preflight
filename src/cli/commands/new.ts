@@ -113,14 +113,14 @@ async function runNew(
     process.exit(1);
   }
 
-  await ensureStore();
-  await mkdir(planDir(slug), { recursive: true });
-
-  // Validate parent exists if provided
+  // Validate parent exists before creating anything
   if (opts.parent && !planExists(opts.parent)) {
     console.error(`Parent plan not found: ${opts.parent}`);
     process.exit(1);
   }
+
+  await ensureStore();
+  await mkdir(planDir(slug), { recursive: true });
 
   const repos = opts.repo ? [opts.repo] : [];
   const tags = opts.tags ? opts.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
