@@ -146,8 +146,8 @@ export async function cmdShow(slug: string | undefined, opts: { brief?: boolean;
 
   process.stdout.write(renderMarkdown(body) + "\n");
 
-  // Interactive actions for actionable statuses (TTY only)
-  if (process.stdout.isTTY && ["in-review", "draft", "approved"].includes(meta.status)) {
+  // Interactive actions (TTY only)
+  if (process.stdout.isTTY) {
     await showActions(resolved, meta.status);
   }
 }
@@ -156,34 +156,60 @@ async function showActions(slug: string, status: string): Promise<void> {
   const { updateMeta } = await import("../../core/meta.ts");
 
   const actions: string[] = [];
-  if (status === "in-review") {
-    actions.push("✓  Approve", "✗  Reject", "✎  Edit in $EDITOR", "⏎  Done");
-  } else if (status === "draft") {
-    actions.push("→  Submit for review", "✎  Edit in $EDITOR", "⏎  Done");
-  } else if (status === "approved") {
-    actions.push("▶  Start executing", "✎  Edit in $EDITOR", "⏎  Done");
+
+  switch (status) {
+    case "draft":
+      actions.push("→  Submit for review", "✎  Edit", "⏎  Done");
+      break;
+    case "in-review":
+      actions.push("✓  Approve", "✗  Reject", "✎  Edit", "⏎  Done");
+      break;
+    case "approved":
+      actions.push("▶  Start executing", "✎  Edit", "⏎  Done");
+      break;
+    case "executing":
+      actions.push("✓  Mark completed", "⏸  Back to in-review", "✎  Edit", "⏎  Done");
+      break;
+    case "completed":
+      actions.push("📦  Archive", "↩  Reopen (draft)", "✎  Edit", "⏎  Done");
+      break;
+    case "rejected":
+      actions.push("↩  Reopen (draft)", "📦  Archive", "⏎  Done");
+      break;
+    case "archived":
+      actions.push("↩  Reopen (draft)", "⏎  Done");
+      break;
   }
+
+  if (actions.length === 0) return;
 
   const selected = await fzfSelect(actions, {
     prompt: "action> ",
-    header: `Plan: ${slug} (${status})`,
+    header: `${slug} (${status})`,
   });
 
-  if (!selected) return;
+  if (!selected || selected.includes("Done")) return;
 
-  if (selected.includes("Approve")) {
-    await updateMeta(slug, { status: "approved" });
-    console.log(`Approved: ${slug}`);
-  } else if (selected.includes("Reject")) {
-    await updateMeta(slug, { status: "rejected" });
-    console.log(`Rejected: ${slug}`);
-  } else if (selected.includes("Submit for review")) {
-    await updateMeta(slug, { status: "in-review" });
-    console.log(`Submitted for review: ${slug}`);
-  } else if (selected.includes("Start executing")) {
-    await updateMeta(slug, { status: "executing" });
-    console.log(`Now executing: ${slug}`);
-  } else if (selected.includes("Edit")) {
+  const ACTION_MAP: [string, string][] = [
+    ["Approve", "approved"],
+    ["Reject", "rejected"],
+    ["Submit for review", "in-review"],
+    ["Start executing", "executing"],
+    ["Mark completed", "completed"],
+    ["Archive", "archived"],
+    ["Back to in-review", "in-review"],
+    ["Reopen", "draft"],
+  ];
+
+  for (const [label, newStatus] of ACTION_MAP) {
+    if (selected.includes(label)) {
+      await updateMeta(slug, { status: newStatus as any });
+      console.log(`${slug} → ${newStatus}`);
+      return;
+    }
+  }
+
+  if (selected.includes("Edit")) {
     const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vi";
     const { planPath: pp } = await import("../../core/store.ts");
     await Bun.$`${editor} ${pp(slug)}`;
