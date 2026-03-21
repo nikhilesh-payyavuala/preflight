@@ -11,12 +11,36 @@ The "plan first, execute second" workflow is how serious agentic coding works in
 - **Plans are not searchable.** That auth migration plan from 3 weeks ago? Good luck finding it.
 - **Plans aren't dual-audience.** They're either human-oriented PRDs or agent-oriented task lists. Nobody serves both.
 
+## Install
+
+**Option 1: Download a prebuilt binary (no dependencies)**
+
+Grab the latest binary from [Releases](https://github.com/nikhilesh-payyavuala/preflight/releases), then:
+
+```bash
+chmod +x pf-*
+sudo mv pf-* /usr/local/bin/pf
+```
+
+**Option 2: Install from source (requires [Bun](https://bun.sh))**
+
+```bash
+curl -fsSL https://bun.sh/install | bash   # skip if you have bun
+git clone https://github.com/nikhilesh-payyavuala/preflight.git
+cd preflight && bun install && bun link
+```
+
+**Option 3: Build a standalone binary yourself**
+
+```bash
+bun install
+bun run build          # outputs dist/pf
+sudo mv dist/pf /usr/local/bin/pf
+```
+
 ## Quick Start
 
 ```bash
-# Install
-bun install -g  # from repo root, or: bun link
-
 # Set up your planning repo (interactive — creates git repo, optionally GitHub)
 pf init
 
