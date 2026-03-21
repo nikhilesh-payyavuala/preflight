@@ -40,6 +40,5 @@ bun install                       # Install dependencies
 
 ## Known Issues (v0.2)
 
-- `listSlugs` in `store.ts` has redundant double-async wrapping
 - `pf search --status/--repo/--tag` filters not yet joined into the FTS query
 - `pf new` doesn't auto-detect the current git repo on error
