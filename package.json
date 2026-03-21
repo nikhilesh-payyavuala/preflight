@@ -1,5 +1,5 @@
 {
-  "name": "@preflight/cli",
+  "name": "@preflightcli/cli",
   "module": "index.ts",
   "type": "module",
   "version": "0.1.0",

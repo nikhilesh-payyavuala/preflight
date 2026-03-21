@@ -16,7 +16,7 @@ The "plan first, execute second" workflow is how serious agentic coding works in
 ```bash
 # One-liner (requires Bun — https://bun.sh)
 curl -fsSL https://bun.sh/install | bash   # skip if you have bun
-bun install -g @preflight/cli
+bun install -g @preflightcli/cli
 ```
 
 Or download a prebuilt binary (no dependencies) from [Releases](https://github.com/nikhilesh-payyavuala/preflight/releases).
