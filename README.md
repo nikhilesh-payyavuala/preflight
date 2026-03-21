@@ -148,6 +148,53 @@ pf install-skills
 - [Skills](docs/skills.md) — agent skill format and installation
 - [Search](docs/search.md) — FTS5 design and roadmap
 
+## Contributing
+
+```bash
+git clone https://github.com/nikhilesh-payyavuala/preflight.git
+cd preflight
+bun install
+
+# Run the CLI locally
+bun src/cli/index.ts show
+
+# Run tests
+bun test
+
+# Build a standalone binary
+bun run build        # outputs dist/pf
+```
+
+Preflight requires [Bun](https://bun.sh) v1.1+ (uses `bun:sqlite`, `Bun.$` shell, and `bun build --compile`).
+
+### Project structure
+
+```
+src/
+  cli/          # Commander commands + TUI (fzf picker, ink renderer)
+  core/         # Store, DB (FTS5), meta.yml parsing, step extraction
+  web/          # Web dashboard API
+  types/        # Shared types
+skills/         # Agent skill definitions (markdown prompts)
+test/           # Tests (bun:test)
+docs/           # Architecture, schema, CLI reference
+```
+
+### Releasing
+
+Tag a version to trigger the release workflow:
+
+```bash
+git tag v0.1.0
+git push --tags      # builds binaries for linux/macOS and creates a GitHub Release
+```
+
+To publish to npm:
+
+```bash
+npm publish --access public
+```
+
 ## License
 
 MIT
