@@ -13,30 +13,13 @@ The "plan first, execute second" workflow is how serious agentic coding works in
 
 ## Install
 
-**Option 1: Download a prebuilt binary (no dependencies)**
-
-Grab the latest binary from [Releases](https://github.com/nikhilesh-payyavuala/preflight/releases), then:
-
 ```bash
-chmod +x pf-*
-sudo mv pf-* /usr/local/bin/pf
-```
-
-**Option 2: Install from source (requires [Bun](https://bun.sh))**
-
-```bash
+# One-liner (requires Bun — https://bun.sh)
 curl -fsSL https://bun.sh/install | bash   # skip if you have bun
-git clone https://github.com/nikhilesh-payyavuala/preflight.git
-cd preflight && bun install && bun link
+bun install -g @preflight/cli
 ```
 
-**Option 3: Build a standalone binary yourself**
-
-```bash
-bun install
-bun run build          # outputs dist/pf
-sudo mv dist/pf /usr/local/bin/pf
-```
+Or download a prebuilt binary (no dependencies) from [Releases](https://github.com/nikhilesh-payyavuala/preflight/releases).
 
 ## Quick Start
 
