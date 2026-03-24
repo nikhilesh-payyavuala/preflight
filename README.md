@@ -11,12 +11,19 @@ The "plan first, execute second" workflow is how serious agentic coding works in
 - **Plans are not searchable.** That auth migration plan from 3 weeks ago? Good luck finding it.
 - **Plans aren't dual-audience.** They're either human-oriented PRDs or agent-oriented task lists. Nobody serves both.
 
+## Install
+
+```bash
+# One-liner (requires Bun — https://bun.sh)
+curl -fsSL https://bun.sh/install | bash   # skip if you have bun
+bun install -g @preflightcli/cli
+```
+
+Or download a prebuilt binary (no dependencies) from [Releases](https://github.com/nikhilesh-payyavuala/preflight/releases).
+
 ## Quick Start
 
 ```bash
-# Install
-bun install -g  # from repo root, or: bun link
-
 # Set up your planning repo (interactive — creates git repo, optionally GitHub)
 pf init
 
@@ -140,6 +147,53 @@ pf install-skills
 - [CLI Reference](docs/cli-reference.md) — every command and flag
 - [Skills](docs/skills.md) — agent skill format and installation
 - [Search](docs/search.md) — FTS5 design and roadmap
+
+## Contributing
+
+```bash
+git clone https://github.com/nikhilesh-payyavuala/preflight.git
+cd preflight
+bun install
+
+# Run the CLI locally
+bun src/cli/index.ts show
+
+# Run tests
+bun test
+
+# Build a standalone binary
+bun run build        # outputs dist/pf
+```
+
+Preflight requires [Bun](https://bun.sh) v1.1+ (uses `bun:sqlite`, `Bun.$` shell, and `bun build --compile`).
+
+### Project structure
+
+```
+src/
+  cli/          # Commander commands + TUI (fzf picker, ink renderer)
+  core/         # Store, DB (FTS5), meta.yml parsing, step extraction
+  web/          # Web dashboard API
+  types/        # Shared types
+skills/         # Agent skill definitions (markdown prompts)
+test/           # Tests (bun:test)
+docs/           # Architecture, schema, CLI reference
+```
+
+### Releasing
+
+Tag a version to trigger the release workflow:
+
+```bash
+git tag v0.1.0
+git push --tags      # builds binaries for linux/macOS and creates a GitHub Release
+```
+
+To publish to npm:
+
+```bash
+npm publish --access public
+```
 
 ## License
 
