@@ -2,6 +2,8 @@
 
 The missing infrastructure for AI coding plans — create, search, review, and execute plans across any agent or IDE.
 
+![Preflight CLI Demo](demo.gif)
+
 ## The Problem
 
 The "plan first, execute second" workflow is how serious agentic coding works in 2025-2026. But the tooling around plans is broken:
